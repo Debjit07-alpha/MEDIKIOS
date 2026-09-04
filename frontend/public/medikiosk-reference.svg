@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">MediKiosk care mark</title>
+  <desc id="desc">Three colorful figures surrounding a medical cross in a protective care shape</desc>
+  <defs>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#b8f000"/>
+      <stop offset="1" stop-color="#55b900"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#16d2df"/>
+      <stop offset="1" stop-color="#0871c5"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffd500"/>
+      <stop offset="1" stop-color="#f47d00"/>
+    </linearGradient>
+  </defs>
+  <circle cx="176" cy="77" r="31" fill="url(#green)"/>
+  <circle cx="365" cy="155" r="30" fill="url(#blue)"/>
+  <circle cx="259" cy="177" r="26" fill="url(#gold)"/>
+  <path d="M143 241c-5-70 31-110 88-116 45-5 86 14 129 50-46-19-80-25-111-17-46 12-61 45-58 83 4 48 30 76 73 104-73-19-116-51-121-104Z" fill="url(#green)"/>
+  <path d="M292 180c76-12 128 17 146 68 20 58-15 111-92 151-25 13-52 22-79 28 61-33 92-69 100-107 10-48-14-78-75-96-25-7-49-8-74-4 25-17 47-27 74-40Z" fill="url(#blue)"/>
+  <path d="M240 220c36-10 67 7 91 41 15 22 25 49 32 79-27-33-53-53-78-57-35-5-52 18-54 56-2 31 8 57 22 83-34-35-52-72-49-108 3-49 14-82 36-94Z" fill="url(#gold)"/>
+  <path d="M84 309c17 74 54 119 119 154 19 10 37 18 55 25-11-27-27-54-48-76-40-42-75-66-99-103 1 41 11 72 31 101-27-22-47-53-58-101Z" fill="url(#blue)"/>
+  <path d="M428 309c-17 74-54 119-119 154-19 10-37 18-55 25 11-27 27-54 48-76 40-42 75-66 99-103-1 41-11 72-31 101 27-22 47-53 58-101Z" fill="#173b89"/>
+  <rect x="235" y="244" width="52" height="108" rx="7" fill="#18bdda"/>
+  <rect x="207" y="272" width="108" height="52" rx="7" fill="#18bdda"/>
+</svg>
