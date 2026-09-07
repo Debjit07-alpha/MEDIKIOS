@@ -1,17 +1,26 @@
 export type CareMode = "allopathy" | "ayush";
 
 export type LanguageCode = "hi" | "en" | "mr" | "bn" | "ta" | "te" | "kn" | "gu";
+export type SpeechLocale =
+  "hi-IN" | "en-IN" | "mr-IN" | "bn-IN" | "ta-IN" | "te-IN" | "kn-IN" | "gu-IN";
 
 export type Language = {
   code: LanguageCode;
   native: string;
   english: string;
-  speech: string;
+  speech: SpeechLocale;
+};
+
+export const DEFAULT_LANGUAGE: Language = {
+  code: "en",
+  native: "English",
+  english: "English",
+  speech: "en-IN",
 };
 
 export const LANGUAGES: Language[] = [
   { code: "hi", native: "हिन्दी", english: "Hindi", speech: "hi-IN" },
-  { code: "en", native: "English", english: "English", speech: "en-IN" },
+  DEFAULT_LANGUAGE,
   { code: "mr", native: "मराठी", english: "Marathi", speech: "mr-IN" },
   { code: "bn", native: "বাংলা", english: "Bengali", speech: "bn-IN" },
   { code: "ta", native: "தமிழ்", english: "Tamil", speech: "ta-IN" },
@@ -19,6 +28,14 @@ export const LANGUAGES: Language[] = [
   { code: "kn", native: "ಕನ್ನಡ", english: "Kannada", speech: "kn-IN" },
   { code: "gu", native: "ગુજરાતી", english: "Gujarati", speech: "gu-IN" },
 ];
+
+export function isLanguageCode(value: unknown): value is LanguageCode {
+  return typeof value === "string" && LANGUAGES.some((language) => language.code === value);
+}
+
+export function getLanguage(code: LanguageCode) {
+  return LANGUAGES.find((language) => language.code === code) ?? DEFAULT_LANGUAGE;
+}
 
 export const STEPS = [
   { id: "language", label: "Language", to: "/language" },
@@ -424,6 +441,7 @@ export type ExtractedDoc = {
   facility: string;
   date: string;
   diagnoses: string[];
+  diagnosis?: string;
   medications?: { name: string; dose: string; schedule: string; duration: string }[];
   values?: { name: string; value: string; unit: string; normal: string; abnormal: boolean }[];
   note?: string;
@@ -481,8 +499,18 @@ export const DOC_LIBRARY: Record<DocKind, ExtractedDoc> = {
     date: "2025-11-27",
     diagnoses: ["Community acquired pneumonia", "Type 2 Diabetes Mellitus"],
     medications: [
-      { name: "Amoxicillin-Clavulanate", dose: "625 mg", schedule: "Thrice daily", duration: "7 days" },
-      { name: "Insulin (Human Mixtard)", dose: "12 U", schedule: "Before breakfast", duration: "On discharge" },
+      {
+        name: "Amoxicillin-Clavulanate",
+        dose: "625 mg",
+        schedule: "Thrice daily",
+        duration: "7 days",
+      },
+      {
+        name: "Insulin (Human Mixtard)",
+        dose: "12 U",
+        schedule: "Before breakfast",
+        duration: "On discharge",
+      },
     ],
     note: "Admitted for 5 days with fever and cough. Improved on antibiotics. Review after 1 week.",
   },

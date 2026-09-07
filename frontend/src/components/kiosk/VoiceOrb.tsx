@@ -1,29 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Mic, Loader2, Volume2, Check } from "lucide-react";
-import { createRecognition, speak, stopSpeaking } from "@/lib/speech";
+import { Mic, Loader2, Volume2, Check, Square } from "lucide-react";
+import { createRecognition, speak, stopSpeaking, transcribeAudio } from "@/lib/speech";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/lib/kiosk-hooks";
 
 export type VoiceState = "idle" | "listening" | "processing" | "speaking" | "confirmed";
 
 type Props = {
-  /** Spoken prompt for the current question. */
   prompt: string;
-  /** Words the engine can map a spoken answer onto. */
   matches: { id: string; label: string }[];
   onResolved: (optionId: string, transcript: string) => void;
 };
 
-const STATE_COPY: Record<VoiceState, { title: string; hint: string }> = {
-  idle: { title: "Speak your answer", hint: "Touch the microphone and talk normally" },
-  listening: { title: "I am listening…", hint: "Please speak now" },
-  processing: { title: "Understanding…", hint: "One moment" },
-  speaking: { title: "Reading it back", hint: "Listen to what I understood" },
-  confirmed: { title: "Got it", hint: "Your answer is saved" },
-};
-
 export function VoiceOrb({ prompt, matches, onResolved }: Props) {
+  const { t } = useLanguage();
   const [state, setState] = useState<VoiceState>("idle");
   const [transcript, setTranscript] = useState("");
+  const [error, setError] = useState(false);
+  const recorder = useRef<MediaRecorder | null>(null);
+  const stream = useRef<MediaStream | null>(null);
   const timers = useRef<number[]>([]);
 
   const clearTimers = useCallback(() => {
@@ -31,74 +26,159 @@ export function VoiceOrb({ prompt, matches, onResolved }: Props) {
     timers.current = [];
   }, []);
 
+  const stopRecording = useCallback(() => {
+    if (recorder.current?.state === "recording") recorder.current.stop();
+    stream.current?.getTracks().forEach((track) => track.stop());
+    stream.current = null;
+  }, []);
+
   useEffect(() => {
     setState("idle");
     setTranscript("");
+    setError(false);
     clearTimers();
-    return clearTimers;
-  }, [prompt, clearTimers]);
+    stopRecording();
+    stopSpeaking();
+    return () => {
+      clearTimers();
+      stopRecording();
+      stopSpeaking();
+    };
+  }, [prompt, clearTimers, stopRecording]);
 
   const resolve = useCallback(
     (heard: string) => {
       setTranscript(heard);
       setState("processing");
-      const lower = heard.toLowerCase();
+      const normalized = heard.trim().toLocaleLowerCase();
       const hit =
-        matches.find((m) =>
-          m.label
-            .toLowerCase()
+        matches.find((match) => normalized.includes(match.label.trim().toLocaleLowerCase())) ??
+        matches.find((match) =>
+          match.label
+            .toLocaleLowerCase()
             .split(/[^a-z]+/)
-            .filter((w) => w.length > 3)
-            .some((w) => lower.includes(w)),
-        ) ?? matches[0];
+            .filter((word) => word.length > 3)
+            .some((word) => normalized.includes(word)),
+        ) ??
+        matches[0];
+
       if (!hit) {
+        setError(true);
         setState("idle");
         return;
       }
 
-      timers.current.push(
-        window.setTimeout(() => {
-          setState("speaking");
-          speak(`You said ${hit.label}. Saving it.`, () => {
-            setState("confirmed");
-            timers.current.push(
-              window.setTimeout(() => onResolved(hit.id, heard), 600),
-            );
-          });
-        }, 900),
-      );
+      setState("speaking");
+      void speak(
+        `${hit.label}. ${t("continueQuestions")}.`,
+        () => {
+          setState("confirmed");
+          timers.current.push(window.setTimeout(() => onResolved(hit.id, heard), 600));
+        },
+        () => {
+          setError(true);
+          setState("idle");
+        },
+      ).catch(() => {
+        setError(true);
+        setState("idle");
+      });
     },
-    [matches, onResolved],
+    [matches, onResolved, t],
   );
 
-  const start = () => {
-    if (state !== "idle") return;
-    stopSpeaking();
-    setState("listening");
+  const browserFallback = useCallback(() => {
     const recognition = createRecognition();
     if (!recognition) {
-      // Kiosk demo fallback when the browser has no speech engine.
-      timers.current.push(
-        window.setTimeout(() => resolve(matches[0]?.label ?? "yes"), 2200),
-      );
+      setError(true);
+      setState("idle");
       return;
     }
     recognition.onresult = (event) => {
       const heard = event.results[0]?.[0]?.transcript ?? "";
       resolve(heard);
     };
-    recognition.onerror = () => resolve(matches[0]?.label ?? "yes");
+    recognition.onerror = () => {
+      setError(true);
+      setState("idle");
+    };
     recognition.start();
+  }, [resolve]);
+
+  const start = async () => {
+    if (state === "listening") {
+      stopRecording();
+      return;
+    }
+    if (state !== "idle") return;
+    setError(false);
+    setTranscript("");
+    stopSpeaking();
+
+    if (typeof MediaRecorder === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      setState("listening");
+      browserFallback();
+      return;
+    }
+
+    try {
+      console.info("Microphone permission requested");
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      console.info("Microphone permission granted");
+      stream.current = mediaStream;
+      const chunks: BlobPart[] = [];
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : "audio/webm";
+      const mediaRecorder = new MediaRecorder(mediaStream, { mimeType });
+      recorder.current = mediaRecorder;
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size) chunks.push(event.data);
+      };
+      mediaRecorder.onerror = (event) => {
+        console.error("Audio recording error", event);
+        setError(true);
+        setState("idle");
+      };
+      mediaRecorder.onstop = async () => {
+        mediaStream.getTracks().forEach((track) => track.stop());
+        stream.current = null;
+        setState("processing");
+        try {
+          const result = await transcribeAudio(new Blob(chunks, { type: mimeType }));
+          if (!result.text) throw new Error("STT returned no transcript");
+          resolve(result.text);
+        } catch (error) {
+          console.error("Speech transcription failed", error);
+          setError(true);
+          setState("idle");
+        }
+      };
+      setState("listening");
+      mediaRecorder.start();
+      timers.current.push(window.setTimeout(stopRecording, 8000));
+    } catch (error) {
+      console.error("Microphone permission or recording failed", error);
+      setError(true);
+      setState("idle");
+      browserFallback();
+    }
   };
 
-  const copy = STATE_COPY[state];
+  const copy = {
+    idle: { title: t("voiceSpeak"), hint: t("voiceHint") },
+    listening: { title: t("voiceListening"), hint: t("voiceHint") },
+    processing: { title: t("voiceProcessing"), hint: t("voiceHint") },
+    speaking: { title: t("voiceReading"), hint: t("voiceHint") },
+    confirmed: { title: t("voiceGotIt"), hint: t("voiceHint") },
+  }[state];
 
   return (
     <div className="flex flex-col items-center gap-4 rounded-3xl border-2 border-border bg-card p-6 text-center shadow-card">
       <button
         type="button"
         onClick={start}
-        aria-label="Answer with your voice"
+        aria-label={state === "listening" ? t("stop") : t("voiceSpeak")}
         className={cn(
           "grid size-28 place-items-center rounded-full transition-all active:scale-95",
           state === "listening"
@@ -109,18 +189,7 @@ export function VoiceOrb({ prompt, matches, onResolved }: Props) {
         )}
       >
         {state === "listening" ? (
-          <span className="flex h-10 items-end gap-1.5">
-            {[0, 1, 2, 3, 4].map((i) => (
-              <span
-                key={i}
-                className="w-2 rounded-full bg-primary-foreground"
-                style={{
-                  height: "100%",
-                  animation: `kiosk-bar 900ms ease-in-out ${i * 110}ms infinite`,
-                }}
-              />
-            ))}
-          </span>
+          <Square className="size-12" />
         ) : state === "processing" ? (
           <Loader2 className="size-12 animate-spin" />
         ) : state === "speaking" ? (
@@ -133,7 +202,7 @@ export function VoiceOrb({ prompt, matches, onResolved }: Props) {
       </button>
       <div>
         <p className="text-xl font-extrabold text-foreground">{copy.title}</p>
-        <p className="text-base text-muted-foreground">{copy.hint}</p>
+        <p className="text-base text-muted-foreground">{error ? t("voiceError") : copy.hint}</p>
       </div>
       {transcript ? (
         <p className="rounded-2xl bg-muted px-4 py-2 text-lg italic text-muted-foreground">

@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { HeartPulse, Stethoscope, UserRound, Languages, ShieldCheck, ScanLine } from "lucide-react";
 import { ListenButton } from "@/components/kiosk/ListenButton";
 import { RedFlagOverlay } from "@/components/kiosk/RedFlagOverlay";
-import { useKiosk } from "@/lib/kiosk-store";
+import { useKiosk } from "@/lib/kiosk-hooks";
 
 const WELCOME =
   "Namaste. I will ask a few easy questions. You can speak your answer or touch a picture. It takes about five minutes.";
@@ -81,10 +81,17 @@ function Welcome() {
         <div className="mt-10 grid w-full gap-4 sm:grid-cols-3">
           {[
             { icon: Languages, title: "8 languages", text: "Hindi, English and more" },
-            { icon: ShieldCheck, title: "Your consent first", text: "Nothing is shared without you" },
+            {
+              icon: ShieldCheck,
+              title: "Your consent first",
+              text: "Nothing is shared without you",
+            },
             { icon: ScanLine, title: "Papers read for you", text: "Prescriptions and lab reports" },
           ].map((f) => (
-            <div key={f.title} className="rounded-3xl border border-border bg-card p-5 text-left shadow-card">
+            <div
+              key={f.title}
+              className="rounded-3xl border border-border bg-card p-5 text-left shadow-card"
+            >
               <f.icon className="size-8 text-primary" />
               <p className="mt-3 text-xl font-extrabold">{f.title}</p>
               <p className="text-base text-muted-foreground">{f.text}</p>

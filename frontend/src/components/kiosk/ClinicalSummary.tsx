@@ -4,6 +4,8 @@ import { questionsForMode, type CareMode, type ExtractedDoc } from "@/lib/kiosk-
 import { DocumentCard } from "./DocumentCard";
 import { ListenButton } from "./ListenButton";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/lib/kiosk-hooks";
+import { localizeQuestion } from "@/lib/question-i18n";
 
 export type SummaryRow = {
   section: string;
@@ -16,17 +18,17 @@ export function buildSummary(
   mode: CareMode,
   answers: Record<string, string[]>,
   fallback = "Not answered",
+  language: import("@/lib/kiosk-data").LanguageCode = "en",
 ): SummaryRow[] {
   return questionsForMode(mode)
     .filter((q) => (q.showIf ? q.showIf(answers) : true))
     .map((q) => {
       const picked = answers[q.id] ?? [];
+      const localized = localizeQuestion(q, language);
       const value = picked.length
-        ? picked
-            .map((id) => q.options.find((o) => o.id === id)?.label ?? id)
-            .join(", ")
+        ? picked.map((id) => localized.options.find((o) => o.id === id)?.label ?? id).join(", ")
         : fallback;
-      return { section: q.section, field: q.field, label: q.fieldLabel, value };
+      return { section: localized.section, field: q.field, label: localized.fieldLabel, value };
     });
 }
 
@@ -43,6 +45,7 @@ export function ClinicalSummary({
   editable?: boolean;
   onChange?: (rows: SummaryRow[]) => void;
 }) {
+  const { language, t } = useLanguage();
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
 
@@ -65,7 +68,10 @@ export function ClinicalSummary({
       </div>
 
       {Object.entries(sections).map(([section, items]) => (
-        <section key={section} className="rounded-4xl border-2 border-border bg-card p-6 shadow-card">
+        <section
+          key={section}
+          className="rounded-4xl border-2 border-border bg-card p-6 shadow-card"
+        >
           <h3 className="text-2xl font-extrabold">{section}</h3>
           <dl className="mt-4 grid gap-3">
             {items.map((row) => {
@@ -90,7 +96,7 @@ export function ClinicalSummary({
                       <dd
                         className={cn(
                           "mt-1 text-xl font-semibold",
-                          row.value === "Not answered" && "text-muted-foreground italic",
+                          row.value === t("notAnswered") && "text-muted-foreground italic",
                         )}
                       >
                         {row.value}
@@ -106,7 +112,7 @@ export function ClinicalSummary({
                           onClick={() => {
                             onChange?.(
                               rows.map((r) =>
-                                r === row ? { ...r, value: draft || "Not answered" } : r,
+                                r === row ? { ...r, value: draft || t("notAnswered") } : r,
                               ),
                             );
                             setEditing(null);
@@ -130,7 +136,7 @@ export function ClinicalSummary({
                         aria-label={`Edit ${row.label}`}
                         onClick={() => {
                           setEditing(row.field + row.label);
-                          setDraft(row.value === "Not answered" ? "" : row.value);
+                          setDraft(row.value === t("notAnswered") ? "" : row.value);
                         }}
                         className="grid size-11 place-items-center rounded-full border border-border"
                       >

@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Stethoscope, Leaf } from "lucide-react";
 import { KioskShell, PageHeading } from "@/components/kiosk/KioskShell";
-import { useKiosk } from "@/lib/kiosk-store";
+import { useKiosk, useLanguage } from "@/lib/kiosk-hooks";
 import type { CareMode } from "@/lib/kiosk-data";
 import { cn } from "@/lib/utils";
 
@@ -9,9 +9,16 @@ export const Route = createFileRoute("/care")({
   head: () => ({
     meta: [
       { title: "Choose your treatment — Allopathy or AYUSH — MediKiosk" },
-      { name: "description", content: "Pick modern medicine or AYUSH care. MediKiosk then asks the right history questions for that system." },
+      {
+        name: "description",
+        content:
+          "Pick modern medicine or AYUSH care. MediKiosk then asks the right history questions for that system.",
+      },
       { property: "og:title", content: "Allopathy or AYUSH — MediKiosk" },
-      { property: "og:description", content: "Two clear care pathways with history workflows tuned to each system of medicine." },
+      {
+        property: "og:description",
+        content: "Two clear care pathways with history workflows tuned to each system of medicine.",
+      },
     ],
   }),
   component: CarePage,
@@ -31,7 +38,12 @@ const CARDS: {
     title: "Modern medicine",
     native: "एलोपैथी",
     sub: "OPD doctor, tests and tablets",
-    points: ["Your main problem", "Old illness and operations", "Medicines and allergy", "Family and habits"],
+    points: [
+      "Your main problem",
+      "Old illness and operations",
+      "Medicines and allergy",
+      "Family and habits",
+    ],
   },
   {
     mode: "ayush",
@@ -39,24 +51,32 @@ const CARDS: {
     title: "AYUSH care",
     native: "आयुष",
     sub: "Ayurveda, Yoga, Unani, Siddha, Homoeopathy",
-    points: ["Your body nature", "Digestion and strength", "Sleep, mind and habits", "How the problem grew"],
+    points: [
+      "Your body nature",
+      "Digestion and strength",
+      "Sleep, mind and habits",
+      "How the problem grew",
+    ],
   },
 ];
 
 function CarePage() {
   const { setCareMode, careMode } = useKiosk();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   return (
     <KioskShell step="care">
       <PageHeading
-        title="Which treatment do you want today?"
-        subtitle="Both are available in this hospital. You can change it later with the doctor."
-        listenText="Which treatment do you want today? Modern medicine, or AYUSH care. Both are available in this hospital."
+        title={t("careTitle")}
+        subtitle={t("careSubtitle")}
+        listenText={`${t("careTitle")} ${t("modernMedicine")}, ${t("ayushCare")}. ${t("careSubtitle")}`}
       />
 
       <div className="grid gap-6 lg:grid-cols-2">
         {CARDS.map((c) => {
+          const title = c.mode === "ayush" ? t("ayushCare") : t("modernMedicine");
+          const sub = c.mode === "ayush" ? t("ayushCareSub") : t("modernMedicineSub");
           const ayush = c.mode === "ayush";
           return (
             <div
@@ -74,16 +94,19 @@ function CarePage() {
               >
                 <c.icon className="size-10" />
               </span>
-              <h2 className="mt-6 text-4xl">{c.title}</h2>
+              <h2 className="mt-6 text-4xl">{title}</h2>
               <p className={cn("text-3xl font-extrabold", ayush ? "text-ayush" : "text-primary")}>
                 {c.native}
               </p>
-              <p className="mt-3 text-xl text-muted-foreground">{c.sub}</p>
+              <p className="mt-3 text-xl text-muted-foreground">{sub}</p>
               <ul className="mt-5 flex-1 space-y-3">
                 {c.points.map((p) => (
                   <li key={p} className="flex items-center gap-3 text-xl">
                     <span
-                      className={cn("size-3 shrink-0 rounded-full", ayush ? "bg-ayush" : "bg-primary")}
+                      className={cn(
+                        "size-3 shrink-0 rounded-full",
+                        ayush ? "bg-ayush" : "bg-primary",
+                      )}
                     />
                     {p}
                   </li>
@@ -97,12 +120,10 @@ function CarePage() {
                 }}
                 className={cn(
                   "mt-7 min-h-20 rounded-3xl text-2xl font-extrabold shadow-lift active:scale-[0.99]",
-                  ayush
-                    ? "bg-ayush text-ayush-foreground"
-                    : "bg-primary text-primary-foreground",
+                  ayush ? "bg-ayush text-ayush-foreground" : "bg-primary text-primary-foreground",
                 )}
               >
-                Choose this
+                {t("chooseThis")}
               </button>
             </div>
           );

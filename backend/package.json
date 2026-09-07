@@ -10,18 +10,28 @@
   "keywords": [],
   "type": "commonjs",
   "dependencies": {
+    "@google-cloud/speech": "^8.0.1",
+    "@google-cloud/text-to-speech": "^7.0.0",
+    "@google-cloud/vision": "^6.0.0",
+    "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.112.4",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "multer": "^2.3.0",
+    "openai": "^7.10.0",
     "zod": "^4.5.4"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/multer": "^2.2.0",
     "@types/node": "^26.4.0",
     "nodemon": "^3.1.14",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
+  },
+  "allowScripts": {
+    "protobufjs@7.6.6": true
   }
 }

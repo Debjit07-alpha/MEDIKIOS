@@ -23,8 +23,14 @@ import { Route as ShareRouteImport } from './routes/share'
 import { Route as StaffRouteImport } from './routes/staff'
 import { Route as SummaryRouteImport } from './routes/summary'
 import { Route as TimelineRouteImport } from './routes/timeline'
+import { Route as IdentityAadhaarRouteImport } from './routes/identity.aadhaar'
+import { Route as IdentityAbhaRouteImport } from './routes/identity.abha'
+import { Route as IdentityNewPatientRouteImport } from './routes/identity.new-patient'
 import { Route as StaffIndexRouteImport } from './routes/staff.index'
 import { Route as StaffPatientIdRouteImport } from './routes/staff.$patientId'
+import { Route as IdentityAadhaarScanRouteImport } from './routes/identity.aadhaar.scan'
+import { Route as IdentityAbhaInputRouteImport } from './routes/identity.abha.input'
+import { Route as IdentityNewPatientFormRouteImport } from './routes/identity.new-patient.form'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -96,6 +102,21 @@ const TimelineRoute = TimelineRouteImport.update({
   path: '/timeline',
   getParentRoute: () => rootRouteImport,
 } as any)
+const IdentityAadhaarRoute = IdentityAadhaarRouteImport.update({
+  id: '/aadhaar',
+  path: '/aadhaar',
+  getParentRoute: () => IdentityRoute,
+} as any)
+const IdentityAbhaRoute = IdentityAbhaRouteImport.update({
+  id: '/abha',
+  path: '/abha',
+  getParentRoute: () => IdentityRoute,
+} as any)
+const IdentityNewPatientRoute = IdentityNewPatientRouteImport.update({
+  id: '/new-patient',
+  path: '/new-patient',
+  getParentRoute: () => IdentityRoute,
+} as any)
 const StaffIndexRoute = StaffIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -106,6 +127,21 @@ const StaffPatientIdRoute = StaffPatientIdRouteImport.update({
   path: '/$patientId',
   getParentRoute: () => StaffRoute,
 } as any)
+const IdentityAadhaarScanRoute = IdentityAadhaarScanRouteImport.update({
+  id: '/scan',
+  path: '/scan',
+  getParentRoute: () => IdentityAadhaarRoute,
+} as any)
+const IdentityAbhaInputRoute = IdentityAbhaInputRouteImport.update({
+  id: '/input',
+  path: '/input',
+  getParentRoute: () => IdentityAbhaRoute,
+} as any)
+const IdentityNewPatientFormRoute = IdentityNewPatientFormRouteImport.update({
+  id: '/form',
+  path: '/form',
+  getParentRoute: () => IdentityNewPatientRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -114,7 +150,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/done': typeof DoneRoute
   '/help': typeof HelpRoute
-  '/identity': typeof IdentityRoute
+  '/identity': typeof IdentityRouteWithChildren
   '/interview': typeof InterviewRoute
   '/language': typeof LanguageRoute
   '/papers': typeof PapersRoute
@@ -122,8 +158,14 @@ export interface FileRoutesByFullPath {
   '/staff': typeof StaffRouteWithChildren
   '/summary': typeof SummaryRoute
   '/timeline': typeof TimelineRoute
+  '/identity/aadhaar': typeof IdentityAadhaarRouteWithChildren
+  '/identity/abha': typeof IdentityAbhaRouteWithChildren
+  '/identity/new-patient': typeof IdentityNewPatientRouteWithChildren
   '/staff/$patientId': typeof StaffPatientIdRoute
   '/staff/': typeof StaffIndexRoute
+  '/identity/aadhaar/scan': typeof IdentityAadhaarScanRoute
+  '/identity/abha/input': typeof IdentityAbhaInputRoute
+  '/identity/new-patient/form': typeof IdentityNewPatientFormRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -132,15 +174,21 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/done': typeof DoneRoute
   '/help': typeof HelpRoute
-  '/identity': typeof IdentityRoute
+  '/identity': typeof IdentityRouteWithChildren
   '/interview': typeof InterviewRoute
   '/language': typeof LanguageRoute
   '/papers': typeof PapersRoute
   '/share': typeof ShareRoute
   '/summary': typeof SummaryRoute
   '/timeline': typeof TimelineRoute
+  '/identity/aadhaar': typeof IdentityAadhaarRouteWithChildren
+  '/identity/abha': typeof IdentityAbhaRouteWithChildren
+  '/identity/new-patient': typeof IdentityNewPatientRouteWithChildren
   '/staff/$patientId': typeof StaffPatientIdRoute
   '/staff': typeof StaffIndexRoute
+  '/identity/aadhaar/scan': typeof IdentityAadhaarScanRoute
+  '/identity/abha/input': typeof IdentityAbhaInputRoute
+  '/identity/new-patient/form': typeof IdentityNewPatientFormRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -150,7 +198,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/done': typeof DoneRoute
   '/help': typeof HelpRoute
-  '/identity': typeof IdentityRoute
+  '/identity': typeof IdentityRouteWithChildren
   '/interview': typeof InterviewRoute
   '/language': typeof LanguageRoute
   '/papers': typeof PapersRoute
@@ -158,8 +206,14 @@ export interface FileRoutesById {
   '/staff': typeof StaffRouteWithChildren
   '/summary': typeof SummaryRoute
   '/timeline': typeof TimelineRoute
+  '/identity/aadhaar': typeof IdentityAadhaarRouteWithChildren
+  '/identity/abha': typeof IdentityAbhaRouteWithChildren
+  '/identity/new-patient': typeof IdentityNewPatientRouteWithChildren
   '/staff/$patientId': typeof StaffPatientIdRoute
   '/staff/': typeof StaffIndexRoute
+  '/identity/aadhaar/scan': typeof IdentityAadhaarScanRoute
+  '/identity/abha/input': typeof IdentityAbhaInputRoute
+  '/identity/new-patient/form': typeof IdentityNewPatientFormRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -178,8 +232,14 @@ export interface FileRouteTypes {
     | '/staff'
     | '/summary'
     | '/timeline'
+    | '/identity/aadhaar'
+    | '/identity/abha'
+    | '/identity/new-patient'
     | '/staff/$patientId'
     | '/staff/'
+    | '/identity/aadhaar/scan'
+    | '/identity/abha/input'
+    | '/identity/new-patient/form'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -195,8 +255,14 @@ export interface FileRouteTypes {
     | '/share'
     | '/summary'
     | '/timeline'
+    | '/identity/aadhaar'
+    | '/identity/abha'
+    | '/identity/new-patient'
     | '/staff/$patientId'
     | '/staff'
+    | '/identity/aadhaar/scan'
+    | '/identity/abha/input'
+    | '/identity/new-patient/form'
   id:
     | '__root__'
     | '/'
@@ -213,8 +279,14 @@ export interface FileRouteTypes {
     | '/staff'
     | '/summary'
     | '/timeline'
+    | '/identity/aadhaar'
+    | '/identity/abha'
+    | '/identity/new-patient'
     | '/staff/$patientId'
     | '/staff/'
+    | '/identity/aadhaar/scan'
+    | '/identity/abha/input'
+    | '/identity/new-patient/form'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -224,7 +296,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   DoneRoute: typeof DoneRoute
   HelpRoute: typeof HelpRoute
-  IdentityRoute: typeof IdentityRoute
+  IdentityRoute: typeof IdentityRouteWithChildren
   InterviewRoute: typeof InterviewRoute
   LanguageRoute: typeof LanguageRoute
   PapersRoute: typeof PapersRoute
@@ -334,6 +406,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TimelineRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/identity/aadhaar': {
+      id: '/identity/aadhaar'
+      path: '/aadhaar'
+      fullPath: '/identity/aadhaar'
+      preLoaderRoute: typeof IdentityAadhaarRouteImport
+      parentRoute: typeof IdentityRoute
+    }
+    '/identity/abha': {
+      id: '/identity/abha'
+      path: '/abha'
+      fullPath: '/identity/abha'
+      preLoaderRoute: typeof IdentityAbhaRouteImport
+      parentRoute: typeof IdentityRoute
+    }
+    '/identity/new-patient': {
+      id: '/identity/new-patient'
+      path: '/new-patient'
+      fullPath: '/identity/new-patient'
+      preLoaderRoute: typeof IdentityNewPatientRouteImport
+      parentRoute: typeof IdentityRoute
+    }
     '/staff/': {
       id: '/staff/'
       path: '/'
@@ -348,8 +441,80 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StaffPatientIdRouteImport
       parentRoute: typeof StaffRoute
     }
+    '/identity/aadhaar/scan': {
+      id: '/identity/aadhaar/scan'
+      path: '/scan'
+      fullPath: '/identity/aadhaar/scan'
+      preLoaderRoute: typeof IdentityAadhaarScanRouteImport
+      parentRoute: typeof IdentityAadhaarRoute
+    }
+    '/identity/abha/input': {
+      id: '/identity/abha/input'
+      path: '/input'
+      fullPath: '/identity/abha/input'
+      preLoaderRoute: typeof IdentityAbhaInputRouteImport
+      parentRoute: typeof IdentityAbhaRoute
+    }
+    '/identity/new-patient/form': {
+      id: '/identity/new-patient/form'
+      path: '/form'
+      fullPath: '/identity/new-patient/form'
+      preLoaderRoute: typeof IdentityNewPatientFormRouteImport
+      parentRoute: typeof IdentityNewPatientRoute
+    }
   }
 }
+
+interface IdentityAadhaarRouteChildren {
+  IdentityAadhaarScanRoute: typeof IdentityAadhaarScanRoute
+}
+
+const IdentityAadhaarRouteChildren: IdentityAadhaarRouteChildren = {
+  IdentityAadhaarScanRoute: IdentityAadhaarScanRoute,
+}
+
+const IdentityAadhaarRouteWithChildren = IdentityAadhaarRoute._addFileChildren(
+  IdentityAadhaarRouteChildren,
+)
+
+interface IdentityAbhaRouteChildren {
+  IdentityAbhaInputRoute: typeof IdentityAbhaInputRoute
+}
+
+const IdentityAbhaRouteChildren: IdentityAbhaRouteChildren = {
+  IdentityAbhaInputRoute: IdentityAbhaInputRoute,
+}
+
+const IdentityAbhaRouteWithChildren = IdentityAbhaRoute._addFileChildren(
+  IdentityAbhaRouteChildren,
+)
+
+interface IdentityNewPatientRouteChildren {
+  IdentityNewPatientFormRoute: typeof IdentityNewPatientFormRoute
+}
+
+const IdentityNewPatientRouteChildren: IdentityNewPatientRouteChildren = {
+  IdentityNewPatientFormRoute: IdentityNewPatientFormRoute,
+}
+
+const IdentityNewPatientRouteWithChildren =
+  IdentityNewPatientRoute._addFileChildren(IdentityNewPatientRouteChildren)
+
+interface IdentityRouteChildren {
+  IdentityAadhaarRoute: typeof IdentityAadhaarRouteWithChildren
+  IdentityAbhaRoute: typeof IdentityAbhaRouteWithChildren
+  IdentityNewPatientRoute: typeof IdentityNewPatientRouteWithChildren
+}
+
+const IdentityRouteChildren: IdentityRouteChildren = {
+  IdentityAadhaarRoute: IdentityAadhaarRouteWithChildren,
+  IdentityAbhaRoute: IdentityAbhaRouteWithChildren,
+  IdentityNewPatientRoute: IdentityNewPatientRouteWithChildren,
+}
+
+const IdentityRouteWithChildren = IdentityRoute._addFileChildren(
+  IdentityRouteChildren,
+)
 
 interface StaffRouteChildren {
   StaffPatientIdRoute: typeof StaffPatientIdRoute
@@ -370,7 +535,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   DoneRoute: DoneRoute,
   HelpRoute: HelpRoute,
-  IdentityRoute: IdentityRoute,
+  IdentityRoute: IdentityRouteWithChildren,
   InterviewRoute: InterviewRoute,
   LanguageRoute: LanguageRoute,
   PapersRoute: PapersRoute,

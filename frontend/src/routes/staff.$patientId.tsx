@@ -10,9 +10,17 @@ export const Route = createFileRoute("/staff/$patientId")({
   head: () => ({
     meta: [
       { title: "Patient intake review — MediKiosk" },
-      { name: "description", content: "Physician-ready structured history, digitised documents, timeline and abnormal values with edit, confirm and reject actions." },
+      {
+        name: "description",
+        content:
+          "Physician-ready structured history, digitised documents, timeline and abnormal values with edit, confirm and reject actions.",
+      },
       { property: "og:title", content: "Patient intake review — MediKiosk" },
-      { property: "og:description", content: "Review, edit and confirm the kiosk-generated clinical summary before consultation." },
+      {
+        property: "og:description",
+        content:
+          "Review, edit and confirm the kiosk-generated clinical summary before consultation.",
+      },
     ],
   }),
   component: PatientReview,
@@ -131,7 +139,13 @@ function PatientReview() {
           </div>
         ) : null}
 
-        <ClinicalSummary mode={mode} rows={rows} documents={documents} editable onChange={setRows} />
+        <ClinicalSummary
+          mode={mode}
+          rows={rows}
+          documents={documents}
+          editable
+          onChange={setRows}
+        />
 
         <div className="sticky bottom-0 mt-8 grid gap-3 border-t border-border bg-background/95 py-4 backdrop-blur sm:grid-cols-2">
           <button

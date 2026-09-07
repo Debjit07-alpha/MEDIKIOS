@@ -5,16 +5,25 @@ import { KioskShell } from "@/components/kiosk/KioskShell";
 import { ListenButton } from "@/components/kiosk/ListenButton";
 import { VoiceOrb } from "@/components/kiosk/VoiceOrb";
 import { questionsForMode, type Question } from "@/lib/kiosk-data";
-import { useKiosk } from "@/lib/kiosk-store";
+import { localizeQuestion } from "@/lib/question-i18n";
+import { useKiosk, useLanguage } from "@/lib/kiosk-hooks";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/interview")({
   head: () => ({
     meta: [
       { title: "AI clinical interview — MediKiosk" },
-      { name: "description", content: "Adaptive history taking by voice or large touch options, with instant red-flag detection for emergency symptoms." },
+      {
+        name: "description",
+        content:
+          "Adaptive history taking by voice or large touch options, with instant red-flag detection for emergency symptoms.",
+      },
       { property: "og:title", content: "AI clinical interview — MediKiosk" },
-      { property: "og:description", content: "Every question can be spoken or touched, and answers map to structured clinical fields." },
+      {
+        property: "og:description",
+        content:
+          "Every question can be spoken or touched, and answers map to structured clinical fields.",
+      },
     ],
   }),
   component: InterviewPage,
@@ -22,6 +31,7 @@ export const Route = createFileRoute("/interview")({
 
 function InterviewPage() {
   const { careMode, answers, answer, raiseRedFlag } = useKiosk();
+  const { language, t } = useLanguage();
   const navigate = useNavigate();
   const [index, setIndex] = useState(0);
 
@@ -31,6 +41,7 @@ function InterviewPage() {
     [pool, answers],
   );
   const question: Question | undefined = visible[Math.min(index, visible.length - 1)];
+  const localizedQuestion = question ? localizeQuestion(question, language) : undefined;
   const selected = question ? (answers[question.id] ?? []) : [];
 
   if (!question) return null;
@@ -50,7 +61,7 @@ function InterviewPage() {
 
     if (option?.redFlag) {
       raiseRedFlag({
-        label: "Possible emergency symptom detected",
+        label: t("possibleEmergency"),
         detail: `${question.prompt} — patient answered “${option.label}”.`,
         at: new Date().toISOString(),
       });
@@ -72,9 +83,11 @@ function InterviewPage() {
       <div className="mb-6">
         <div className="flex items-center justify-between text-lg font-semibold text-muted-foreground">
           <span>
-            Question {index + 1} of {visible.length}
+            {t("question")} {index + 1} {t("of")} {visible.length}
           </span>
-          <span className="rounded-full bg-accent px-4 py-1 text-primary">{question.section}</span>
+          <span className="rounded-full bg-accent px-4 py-1 text-primary">
+            {localizedQuestion?.section}
+          </span>
         </div>
         <div className="mt-2 h-3 overflow-hidden rounded-full bg-muted">
           <div
@@ -87,18 +100,22 @@ function InterviewPage() {
       <div className="animate-rise grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
         <div className="min-w-0">
           <h1 className="text-balance-tight text-4xl leading-tight sm:text-5xl">
-            {question.prompt}
+            {localizedQuestion?.prompt}
           </h1>
-          {question.hint ? (
-            <p className="mt-2 text-xl text-muted-foreground">{question.hint}</p>
+          {localizedQuestion?.hint ? (
+            <p className="mt-2 text-xl text-muted-foreground">{localizedQuestion.hint}</p>
           ) : null}
         </div>
-        <ListenButton key={question.id} text={`${question.prompt}. ${question.hint ?? ""}`} autoPlay />
+        <ListenButton
+          key={question.id}
+          text={`${localizedQuestion?.prompt}. ${localizedQuestion?.hint ?? ""}`}
+          autoPlay
+        />
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="grid gap-4 sm:grid-cols-2">
-          {question.options.map((o) => {
+          {localizedQuestion?.options.map((o) => {
             const on = selected.includes(o.id);
             return (
               <button
@@ -129,7 +146,7 @@ function InterviewPage() {
         <VoiceOrb
           key={question.id}
           prompt={question.prompt}
-          matches={question.options.map((o) => ({ id: o.id, label: o.label }))}
+          matches={localizedQuestion?.options.map((o) => ({ id: o.id, label: o.label })) ?? []}
           onResolved={(optionId) => choose(optionId)}
         />
       </div>
@@ -140,7 +157,7 @@ function InterviewPage() {
           onClick={() => (index === 0 ? navigate({ to: "/dashboard" }) : setIndex((i) => i - 1))}
           className="inline-flex min-h-16 items-center gap-2 rounded-full border-2 border-border bg-card px-8 text-xl font-bold"
         >
-          <ArrowLeft className="size-6" /> Back
+          <ArrowLeft className="size-6" /> {t("back")}
         </button>
         <button
           type="button"
@@ -148,7 +165,8 @@ function InterviewPage() {
           disabled={selected.length === 0}
           className="inline-flex min-h-20 items-center gap-3 rounded-full bg-primary px-12 text-2xl font-extrabold text-primary-foreground shadow-lift transition-opacity disabled:opacity-40"
         >
-          {index + 1 >= visible.length ? "Finish questions" : "Next"} <ArrowRight className="size-7" />
+          {index + 1 >= visible.length ? t("finishQuestions") : t("next")}{" "}
+          <ArrowRight className="size-7" />
         </button>
       </div>
     </KioskShell>

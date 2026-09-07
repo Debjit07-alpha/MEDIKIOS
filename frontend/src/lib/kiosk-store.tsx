@@ -1,21 +1,15 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   DOC_LIBRARY,
-  LANGUAGES,
   type CareMode,
   type DocKind,
   type ExtractedDoc,
   type LanguageCode,
+  getLanguage,
+  isLanguageCode,
 } from "./kiosk-data";
 import { setSpeechLocale } from "./speech";
+import { KioskContext } from "./kiosk-context";
 
 export type Patient = {
   name: string;
@@ -33,6 +27,8 @@ export type RedFlag = {
 
 type KioskState = {
   language: LanguageCode;
+  identityMethod: "abha" | "aadhaar" | "new" | null;
+  abhaNumber: string;
   consent: boolean;
   patient: Patient | null;
   careMode: CareMode | null;
@@ -45,6 +41,8 @@ type KioskState = {
 
 const initialState: KioskState = {
   language: "en",
+  identityMethod: null,
+  abhaNumber: "",
   consent: false,
   patient: null,
   careMode: null,
@@ -55,8 +53,11 @@ const initialState: KioskState = {
   summaryConfirmed: false,
 };
 
-type KioskContextValue = KioskState & {
+export type KioskContextValue = KioskState & {
   setLanguage: (code: LanguageCode) => void;
+  setIdentityMethod: (method: "abha" | "aadhaar" | "new") => void;
+  clearIdentityMethod: () => void;
+  setAbhaNumber: (number: string) => void;
   giveConsent: () => void;
   setPatient: (patient: Patient) => void;
   setCareMode: (mode: CareMode) => void;
@@ -69,7 +70,6 @@ type KioskContextValue = KioskState & {
   reset: () => void;
 };
 
-const KioskContext = createContext<KioskContextValue | null>(null);
 const STORAGE_KEY = "medikiosk-session-v1";
 
 export function KioskProvider({ children }: { children: ReactNode }) {
@@ -78,7 +78,14 @@ export function KioskProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) setState({ ...initialState, ...(JSON.parse(raw) as KioskState) });
+      if (raw) {
+        const saved = JSON.parse(raw) as Partial<KioskState>;
+        setState({
+          ...initialState,
+          ...saved,
+          language: isLanguageCode(saved.language) ? saved.language : initialState.language,
+        });
+      }
     } catch {
       /* ignore corrupted session */
     }
@@ -90,9 +97,12 @@ export function KioskProvider({ children }: { children: ReactNode }) {
     } catch {
       /* storage unavailable */
     }
-    const lang = LANGUAGES.find((l) => l.code === state.language);
-    setSpeechLocale(lang?.speech ?? "en-IN");
   }, [state]);
+
+  useEffect(() => {
+    setSpeechLocale(getLanguage(state.language).speech);
+    document.documentElement.lang = getLanguage(state.language).speech;
+  }, [state.language]);
 
   const patch = useCallback(
     (next: Partial<KioskState>) => setState((prev) => ({ ...prev, ...next })),
@@ -103,6 +113,9 @@ export function KioskProvider({ children }: { children: ReactNode }) {
     () => ({
       ...state,
       setLanguage: (language) => patch({ language }),
+      setIdentityMethod: (identityMethod) => patch({ identityMethod }),
+      clearIdentityMethod: () => patch({ identityMethod: null }),
+      setAbhaNumber: (abhaNumber) => patch({ abhaNumber }),
       giveConsent: () => patch({ consent: true }),
       setPatient: (patient) => patch({ patient }),
       setCareMode: (careMode) => patch({ careMode }),
@@ -123,10 +136,4 @@ export function KioskProvider({ children }: { children: ReactNode }) {
   );
 
   return <KioskContext.Provider value={value}>{children}</KioskContext.Provider>;
-}
-
-export function useKiosk() {
-  const ctx = useContext(KioskContext);
-  if (!ctx) throw new Error("useKiosk must be used inside KioskProvider");
-  return ctx;
 }

@@ -1,16 +1,23 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ArrowRight, CalendarClock, Pill, FlaskConical, Hospital, Stethoscope } from "lucide-react";
 import { KioskShell, PageHeading } from "@/components/kiosk/KioskShell";
-import { useKiosk } from "@/lib/kiosk-store";
+import { useKiosk, useLanguage } from "@/lib/kiosk-hooks";
 import type { ExtractedDoc } from "@/lib/kiosk-data";
 
 export const Route = createFileRoute("/timeline")({
   head: () => ({
     meta: [
       { title: "Your health timeline — MediKiosk" },
-      { name: "description", content: "Every scanned prescription, lab report and discharge summary placed in date order for the doctor." },
+      {
+        name: "description",
+        content:
+          "Every scanned prescription, lab report and discharge summary placed in date order for the doctor.",
+      },
       { property: "og:title", content: "Your health timeline — MediKiosk" },
-      { property: "og:description", content: "A chronological medical history built automatically from your own papers." },
+      {
+        property: "og:description",
+        content: "A chronological medical history built automatically from your own papers.",
+      },
     ],
   }),
   component: TimelinePage,
@@ -40,16 +47,30 @@ const ICONS = {
   visit: Stethoscope,
 };
 
+type TimelineKind = keyof typeof ICONS;
+type TimelineEntry = {
+  id: string;
+  date: string;
+  kind: TimelineKind;
+  title: string;
+  facility: string;
+};
+
 function TimelinePage() {
   const { documents } = useKiosk();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
-  const entries = [
-    ...BASE,
+  const entries: TimelineEntry[] = [
+    ...BASE.map((entry) => ({
+      ...entry,
+      title: entry.id === "base-1" ? t("timelineDischarge") : t("timelineVisit"),
+      facility: entry.id === "base-1" ? t("timelineDischargeFacility") : t("timelineVisitFacility"),
+    })),
     ...documents.map((d: ExtractedDoc) => ({
       id: d.id,
       date: d.date,
-      kind: d.kind,
+      kind: d.kind as TimelineKind,
       title: `${d.kindLabel}: ${d.diagnoses.join(", ") || d.title}`,
       facility: d.facility,
     })),
@@ -58,9 +79,9 @@ function TimelinePage() {
   return (
     <KioskShell step="timeline">
       <PageHeading
-        title="Your health story in order"
-        subtitle="Newest first. The doctor will see this same list."
-        listenText="This is your health story in order, newest first. The doctor will see this same list."
+        title={t("timelineTitle")}
+        subtitle={t("timelineSubtitle")}
+        listenText={t("timelineListen")}
       />
 
       <ol className="relative ml-4 border-l-4 border-accent pl-8">
@@ -68,7 +89,7 @@ function TimelinePage() {
           const Icon = ICONS[e.kind];
           return (
             <li key={e.id} className="animate-rise relative pb-8 last:pb-0">
-              <span className="absolute -left-[3.25rem] grid size-12 place-items-center rounded-full border-4 border-background bg-primary text-primary-foreground">
+              <span className="absolute -left-13 grid size-12 place-items-center rounded-full border-4 border-background bg-primary text-primary-foreground">
                 <Icon className="size-6" />
               </span>
               <div className="rounded-3xl border border-border bg-card p-5 shadow-card">
@@ -89,7 +110,7 @@ function TimelinePage() {
           onClick={() => navigate({ to: "/summary" })}
           className="inline-flex min-h-20 items-center gap-3 rounded-full bg-primary px-12 text-2xl font-extrabold text-primary-foreground shadow-lift"
         >
-          See my summary <ArrowRight className="size-7" />
+          {t("timelineSummary")} <ArrowRight className="size-7" />
         </button>
       </div>
     </KioskShell>

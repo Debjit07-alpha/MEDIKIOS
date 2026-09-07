@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
-import { Volume2, Square } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Volume2, Square, Loader2 } from "lucide-react";
 import { speak, stopSpeaking } from "@/lib/speech";
+import { useLanguage } from "@/lib/kiosk-hooks";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -12,36 +13,71 @@ type Props = {
 };
 
 export function ListenButton({ text, label = "Listen", size = "md", autoPlay, className }: Props) {
+  const { language, t } = useLanguage();
   const [speaking, setSpeaking] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+
+  const play = useCallback(() => {
+    setError(false);
+    setLoading(true);
+    setSpeaking(false);
+    void speak(
+      text,
+      () => {
+        setLoading(false);
+        setSpeaking(false);
+      },
+      () => {
+        setLoading(false);
+        setSpeaking(false);
+        setError(true);
+      },
+    )
+      .then(() => {
+        setLoading(false);
+        setSpeaking(false);
+      })
+      .catch(() => {
+        setLoading(false);
+        setSpeaking(false);
+        setError(true);
+      });
+  }, [text]);
 
   useEffect(() => {
     if (!autoPlay) return;
     const id = window.setTimeout(() => {
-      setSpeaking(true);
-      speak(text, () => setSpeaking(false));
+      play();
     }, 400);
     return () => {
       window.clearTimeout(id);
       stopSpeaking();
       setSpeaking(false);
     };
-  }, [text, autoPlay]);
+  }, [autoPlay, language, play]);
 
   const toggle = () => {
     if (speaking) {
       stopSpeaking();
       setSpeaking(false);
+      setLoading(false);
+      return;
+    }
+    if (loading) {
+      stopSpeaking();
+      setLoading(false);
       return;
     }
     setSpeaking(true);
-    speak(text, () => setSpeaking(false));
+    play();
   };
 
   return (
     <button
       type="button"
       onClick={toggle}
-      aria-label={speaking ? "Stop audio" : `${label}: ${text}`}
+      aria-label={speaking || loading ? t("stop") : `${label}: ${text}`}
       className={cn(
         "inline-flex shrink-0 items-center gap-2 rounded-full bg-accent font-semibold text-accent-foreground transition-transform active:scale-95",
         "border border-primary/15 shadow-card hover:brightness-[0.98]",
@@ -50,8 +86,22 @@ export function ListenButton({ text, label = "Listen", size = "md", autoPlay, cl
         className,
       )}
     >
-      {speaking ? <Square className="size-5 shrink-0" /> : <Volume2 className="size-6 shrink-0" />}
-      <span className="truncate">{speaking ? "Stop" : label}</span>
+      {loading ? (
+        <Loader2 className="size-5 shrink-0 animate-spin" />
+      ) : speaking ? (
+        <Square className="size-5 shrink-0" />
+      ) : (
+        <Volume2 className="size-6 shrink-0" />
+      )}
+      <span className="truncate">
+        {error
+          ? t("voiceError")
+          : loading || speaking
+            ? t("stop")
+            : label === "Listen"
+              ? t("listen")
+              : label}
+      </span>
     </button>
   );
 }

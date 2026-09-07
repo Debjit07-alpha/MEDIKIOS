@@ -17,9 +17,16 @@ export const Route = createFileRoute("/staff/")({
   head: () => ({
     meta: [
       { title: "Physician dashboard — MediKiosk" },
-      { name: "description", content: "Waiting and completed kiosk intakes with red-flag priority, care mode and document counts for the OPD physician." },
+      {
+        name: "description",
+        content:
+          "Waiting and completed kiosk intakes with red-flag priority, care mode and document counts for the OPD physician.",
+      },
       { property: "og:title", content: "Physician dashboard — MediKiosk" },
-      { property: "og:description", content: "Triage-first patient queue built from kiosk intakes." },
+      {
+        property: "og:description",
+        content: "Triage-first patient queue built from kiosk intakes.",
+      },
     ],
   }),
   component: StaffDashboard,
@@ -126,7 +133,11 @@ function StaffDashboard() {
                       p.mode === "ayush" ? "bg-ayush-soft text-ayush" : "bg-accent text-primary",
                     )}
                   >
-                    {p.mode === "ayush" ? <Leaf className="size-3" /> : <Stethoscope className="size-3" />}
+                    {p.mode === "ayush" ? (
+                      <Leaf className="size-3" />
+                    ) : (
+                      <Stethoscope className="size-3" />
+                    )}
                     {p.mode === "ayush" ? "AYUSH" : "Allopathy"}
                   </span>
                   <span

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { HeartPulse, HelpCircle, Home, Check } from "lucide-react";
 import { STEPS, type StepId, LANGUAGES } from "@/lib/kiosk-data";
-import { useKiosk } from "@/lib/kiosk-store";
+import { useKiosk, useLanguage } from "@/lib/kiosk-hooks";
 import { RedFlagOverlay } from "./RedFlagOverlay";
 import { ListenButton } from "./ListenButton";
 import { cn } from "@/lib/utils";
@@ -17,9 +17,22 @@ export function KioskShell({
   showSteps?: boolean;
 }) {
   const { patient, language } = useKiosk();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const activeIndex = STEPS.findIndex((s) => s.id === step);
   const lang = LANGUAGES.find((l) => l.code === language);
+  const stepLabels = {
+    language: t("stepLanguage"),
+    consent: t("stepConsent"),
+    identity: t("stepIdentity"),
+    care: t("stepCare"),
+    start: t("stepStart"),
+    questions: t("stepQuestions"),
+    papers: t("stepPapers"),
+    timeline: t("stepTimeline"),
+    summary: t("stepSummary"),
+    share: t("stepShare"),
+  };
 
   return (
     <div className="kiosk-surface min-h-screen">
@@ -32,7 +45,7 @@ export function KioskShell({
             <span className="min-w-0">
               <span className="block truncate text-2xl font-extrabold leading-none">MediKiosk</span>
               <span className="block truncate text-sm text-muted-foreground">
-                Guided health assistant
+                {t("guidedAssistant")}
               </span>
             </span>
           </Link>
@@ -56,11 +69,11 @@ export function KioskShell({
               to="/help"
               className="inline-flex min-h-11 items-center gap-2 rounded-full border border-warning/40 bg-warning-soft px-4 text-base font-bold text-warning-foreground"
             >
-              <HelpCircle className="size-5" /> Help
+              <HelpCircle className="size-5" /> {t("help")}
             </Link>
             <Link
               to="/"
-              aria-label="Go to start screen"
+              aria-label={t("home")}
               className="grid size-11 place-items-center rounded-full border border-border bg-card"
             >
               <Home className="size-5" />
@@ -89,7 +102,7 @@ export function KioskShell({
                     )}
                   >
                     {done ? <Check className="size-3.5" /> : <span>{i + 1}</span>}
-                    {s.label}
+                    {stepLabels[s.id]}
                   </span>
                   {i < STEPS.length - 1 ? <span className="h-px w-3 bg-border" /> : null}
                 </div>

@@ -2,12 +2,14 @@ import { AlertTriangle } from "lucide-react";
 import type { ExtractedDoc } from "@/lib/kiosk-data";
 import { ListenButton } from "./ListenButton";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/lib/kiosk-hooks";
 
 export function DocumentCard({ doc, compact }: { doc: ExtractedDoc; compact?: boolean }) {
+  const { t } = useLanguage();
   const abnormal = doc.values?.filter((v) => v.abnormal) ?? [];
   const spoken = [
     `${doc.kindLabel} from ${doc.facility}, dated ${doc.date}.`,
-    doc.diagnoses.length ? `Diagnosis: ${doc.diagnoses.join(", ")}.` : "",
+    doc.diagnoses.length ? `${t("summaryTitle")}: ${doc.diagnoses.join(", ")}.` : "",
     doc.medications?.length
       ? `Medicines: ${doc.medications.map((m) => `${m.name} ${m.dose} ${m.schedule}`).join(", ")}.`
       : "",
@@ -52,7 +54,10 @@ export function DocumentCard({ doc, compact }: { doc: ExtractedDoc; compact?: bo
           </h3>
           <div className="mt-2 flex flex-wrap gap-2">
             {doc.diagnoses.map((d) => (
-              <span key={d} className="rounded-full bg-accent px-4 py-2 text-lg font-semibold text-accent-foreground">
+              <span
+                key={d}
+                className="rounded-full bg-accent px-4 py-2 text-lg font-semibold text-accent-foreground"
+              >
                 {d}
               </span>
             ))}

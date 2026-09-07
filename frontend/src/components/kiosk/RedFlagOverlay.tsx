@@ -1,20 +1,19 @@
 import { useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { AlertTriangle, PhoneCall, ArrowRight } from "lucide-react";
-import { useKiosk } from "@/lib/kiosk-store";
+import { useKiosk, useLanguage } from "@/lib/kiosk-hooks";
 import { speak, stopSpeaking } from "@/lib/speech";
 
 export function RedFlagOverlay() {
   const { redFlag, clearRedFlag } = useKiosk();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!redFlag) return;
-    speak(
-      "Please stay here. Your answer needs a doctor right now. A staff member has been alerted.",
-    );
+    speak(`${t("continueQuestions")}. ${t("callStaff")}.`);
     return () => stopSpeaking();
-  }, [redFlag]);
+  }, [redFlag, t]);
 
   if (!redFlag) return null;
 
@@ -22,7 +21,7 @@ export function RedFlagOverlay() {
     <div
       role="alertdialog"
       aria-modal="true"
-      aria-label="Emergency alert"
+      aria-label={t("possibleEmergency")}
       className="fixed inset-0 z-50 grid place-items-center bg-destructive/25 p-4 backdrop-blur-sm"
     >
       <div className="animate-alert-pulse w-full max-w-3xl rounded-4xl border-4 border-destructive bg-card p-8 shadow-lift">
@@ -32,7 +31,7 @@ export function RedFlagOverlay() {
           </span>
           <div className="min-w-0">
             <p className="text-sm font-bold uppercase tracking-widest text-destructive">
-              Priority alert · triage staff notified
+              {t("possibleEmergency")}
             </p>
             <h2 className="text-4xl text-destructive">Please wait here</h2>
           </div>
@@ -56,7 +55,7 @@ export function RedFlagOverlay() {
             }}
             className="inline-flex min-h-20 items-center justify-center gap-3 rounded-3xl bg-destructive px-6 text-2xl font-extrabold text-destructive-foreground shadow-lift active:scale-[0.99]"
           >
-            <PhoneCall className="size-7" /> Call staff now
+            <PhoneCall className="size-7" /> {t("callStaff")}
           </button>
           <button
             type="button"
@@ -66,7 +65,7 @@ export function RedFlagOverlay() {
             }}
             className="inline-flex min-h-20 items-center justify-center gap-3 rounded-3xl border-2 border-border bg-card px-6 text-2xl font-extrabold active:scale-[0.99]"
           >
-            Continue questions <ArrowRight className="size-7" />
+            {t("continueQuestions")} <ArrowRight className="size-7" />
           </button>
         </div>
       </div>
