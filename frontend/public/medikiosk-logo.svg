@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1016 1000" fill="none" role="img" aria-label="MediKiosk Care Logo">
+  <defs>
+    <!-- Green figure gradients -->
+    <linearGradient id="mk-green-head" x1="20%" y1="10%" x2="80%" y2="90%">
+      <stop offset="0%" stop-color="#a8e800"/>
+      <stop offset="100%" stop-color="#56be00"/>
+    </linearGradient>
+    <linearGradient id="mk-green-body" x1="15%" y1="15%" x2="85%" y2="85%">
+      <stop offset="0%" stop-color="#a4e200"/>
+      <stop offset="55%" stop-color="#6bc600"/>
+      <stop offset="100%" stop-color="#4ab200"/>
+    </linearGradient>
+
+    <!-- Cyan/blue figure gradients -->
+    <linearGradient id="mk-cyan-head" x1="15%" y1="15%" x2="85%" y2="85%">
+      <stop offset="0%" stop-color="#00d7f8"/>
+      <stop offset="100%" stop-color="#0084d6"/>
+    </linearGradient>
+    <linearGradient id="mk-cyan-body" x1="85%" y1="20%" x2="25%" y2="90%">
+      <stop offset="0%" stop-color="#00cdf3"/>
+      <stop offset="55%" stop-color="#0097e2"/>
+      <stop offset="100%" stop-color="#0072c8"/>
+    </linearGradient>
+
+    <!-- Orange figure gradients -->
+    <linearGradient id="mk-orange-head" x1="25%" y1="10%" x2="75%" y2="90%">
+      <stop offset="0%" stop-color="#ffb800"/>
+      <stop offset="100%" stop-color="#f56e00"/>
+    </linearGradient>
+    <linearGradient id="mk-orange-body" x1="15%" y1="25%" x2="85%" y2="85%">
+      <stop offset="0%" stop-color="#ffb800"/>
+      <stop offset="50%" stop-color="#fb8700"/>
+      <stop offset="100%" stop-color="#f05b00"/>
+    </linearGradient>
+
+    <!-- Medical cross gradient -->
+    <linearGradient id="mk-cross" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#24d2ff"/>
+      <stop offset="100%" stop-color="#00aff0"/>
+    </linearGradient>
+
+    <!-- Hands gradients -->
+    <linearGradient id="mk-hand-outer-left" x1="10%" y1="35%" x2="70%" y2="100%">
+      <stop offset="0%" stop-color="#102574"/>
+      <stop offset="45%" stop-color="#0c3f9c"/>
+      <stop offset="85%" stop-color="#0263c9"/>
+      <stop offset="100%" stop-color="#0275db"/>
+    </linearGradient>
+    <linearGradient id="mk-hand-inner-left" x1="20%" y1="45%" x2="75%" y2="95%">
+      <stop offset="0%" stop-color="#15368a"/>
+      <stop offset="50%" stop-color="#0b52b5"/>
+      <stop offset="100%" stop-color="#037fe0"/>
+    </linearGradient>
+
+    <linearGradient id="mk-hand-outer-right" x1="90%" y1="35%" x2="30%" y2="100%">
+      <stop offset="0%" stop-color="#102574"/>
+      <stop offset="45%" stop-color="#0c3f9c"/>
+      <stop offset="85%" stop-color="#0263c9"/>
+      <stop offset="100%" stop-color="#0275db"/>
+    </linearGradient>
+    <linearGradient id="mk-hand-inner-right" x1="80%" y1="45%" x2="25%" y2="95%">
+      <stop offset="0%" stop-color="#15368a"/>
+      <stop offset="50%" stop-color="#0b52b5"/>
+      <stop offset="100%" stop-color="#037fe0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Green Figure (Top-Left) -->
+  <circle cx="331" cy="115" r="72" fill="url(#mk-green-head)"/>
+  <path d="M 285 172 C 340 170, 435 176, 535 218 C 585 238, 630 258, 664 276 C 610 248, 545 224, 475 214 C 425 208, 385 220, 360 250 C 340 330, 345 440, 380 540 C 410 610, 460 655, 498 646 C 425 615, 365 540, 320 440 C 275 340, 270 245, 285 172 Z" fill="url(#mk-green-body)"/>
+
+  <!-- Cyan Figure (Top-Right) -->
+  <circle cx="740" cy="257" r="74" fill="url(#mk-cyan-head)"/>
+  <path d="M 410 348 C 480 336, 580 320, 675 300 C 730 335, 770 410, 765 490 C 760 580, 715 670, 635 735 C 570 785, 500 755, 460 748 C 540 735, 620 680, 670 600 C 705 530, 705 440, 665 375 C 630 325, 560 340, 485 355 C 450 362, 425 355, 410 348 Z" fill="url(#mk-cyan-body)"/>
+
+  <!-- Orange Child Figure (Middle) -->
+  <circle cx="505" cy="293" r="59" fill="url(#mk-orange-head)"/>
+  <path d="M 426 715 C 395 620, 380 500, 405 405 C 425 340, 475 365, 515 365 C 575 365, 625 395, 655 450 C 670 480, 672 505, 670 525 C 645 470, 595 425, 530 422 C 475 422, 435 455, 415 520 C 395 585, 405 660, 426 715 Z" fill="url(#mk-orange-body)"/>
+
+  <!-- Medical Cross (Center) -->
+  <path d="M 504 470 C 504 460, 512 452, 522 452 L 562 452 C 572 452, 580 460, 580 470 L 580 494 L 614 494 C 624 494, 632 502, 632 512 L 632 552 C 632 562, 624 570, 614 570 L 580 570 L 580 610 C 580 620, 572 628, 562 628 L 522 628 C 512 628, 504 620, 504 610 L 504 570 L 470 570 C 460 570, 452 562, 452 552 L 452 512 C 452 502, 460 494, 470 494 L 504 494 Z" fill="url(#mk-cross)"/>
+
+  <!-- Cupped Hands (Left Hand - Outer Wing & Inner Finger) -->
+  <path d="M 172 425 C 150 490, 148 600, 185 710 C 235 840, 340 925, 492 960 C 502 962, 508 961, 508 961 C 508 961, 410 930, 335 845 C 265 765, 230 655, 215 540 C 205 470, 195 430, 172 425 Z" fill="url(#mk-hand-outer-left)"/>
+  <path d="M 272 610 C 285 675, 335 760, 415 825 C 475 870, 508 880, 508 880 C 508 880, 450 840, 385 770 C 330 705, 290 635, 272 610 Z" fill="url(#mk-hand-inner-left)"/>
+
+  <!-- Cupped Hands (Right Hand - Outer Wing & Inner Finger) -->
+  <path d="M 844 425 C 866 490, 868 600, 831 710 C 781 840, 676 925, 524 960 C 514 962, 508 961, 508 961 C 508 961, 606 930, 681 845 C 751 765, 786 655, 801 540 C 811 470, 821 430, 844 425 Z" fill="url(#mk-hand-outer-right)"/>
+  <path d="M 744 610 C 731 675, 681 760, 601 825 C 541 870, 508 880, 508 880 C 508 880, 566 840, 631 770 C 686 705, 726 635, 744 610 Z" fill="url(#mk-hand-inner-right)"/>
+</svg>

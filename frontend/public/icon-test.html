@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>MediKiosk Icon Test</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f0fdf9;
+      margin: 0;
+      padding: 40px;
+      color: #042f2e;
+    }
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+      max-width: 900px;
+      margin-bottom: 40px;
+    }
+    .card {
+      background: #ffffff;
+      border: 1px solid #ccfbf1;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+    }
+    .card h3 {
+      margin-top: 0;
+      font-size: 16px;
+      color: #0f766e;
+    }
+    .header-demo {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(8px);
+      padding: 16px;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+    }
+    .badge {
+      display: grid;
+      place-items: center;
+      border-radius: 9999px;
+      background: #ffffff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      border: 1px solid rgba(0,0,0,0.08);
+    }
+    .badge-lg { width: 56px; height: 56px; padding: 6px; box-sizing: border-box; }
+    .badge-md { width: 48px; height: 48px; padding: 5px; box-sizing: border-box; }
+    .title {
+      font-size: 24px;
+      font-weight: 800;
+      line-height: 1;
+      margin: 0 0 4px 0;
+      color: #0f172a;
+    }
+    .sub {
+      font-size: 14px;
+      color: #64748b;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <h2>MediKiosk — New Reference Logo Verification</h2>
+
+  <div class="comparison-grid">
+    <div class="card">
+      <h3>1. SVG in Round White Badge (size-14, 56px)</h3>
+      <div class="header-demo">
+        <div class="badge badge-lg">
+          <img src="/medikiosk-logo.svg" alt="MediKiosk" style="width: 100%; height: 100%; object-fit: contain;" />
+        </div>
+        <div>
+          <div class="title">MediKiosk</div>
+          <div class="sub">District General Hospital · OPD Block A</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>2. SVG in Round White Badge (size-12, 48px)</h3>
+      <div class="header-demo">
+        <div class="badge badge-md">
+          <img src="/medikiosk-logo.svg" alt="MediKiosk" style="width: 100%; height: 100%; object-fit: contain;" />
+        </div>
+        <div>
+          <div class="title">MediKiosk</div>
+          <div class="sub">Guided Health Assistant</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>3. Bare SVG (No Container Badge)</h3>
+      <div class="header-demo">
+        <img src="/medikiosk-logo.svg" alt="MediKiosk" style="width: 54px; height: 54px; object-fit: contain;" />
+        <div>
+          <div class="title">MediKiosk</div>
+          <div class="sub">District General Hospital · OPD Block A</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

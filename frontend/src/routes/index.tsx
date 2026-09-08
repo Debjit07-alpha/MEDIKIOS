@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { HeartPulse, Stethoscope, UserRound, Languages, ShieldCheck, ScanLine } from "lucide-react";
+import { Stethoscope, UserRound, Languages, ShieldCheck, ScanLine } from "lucide-react";
+import { MediKioskLogo } from "@/components/kiosk/MediKioskLogo";
 import { ListenButton } from "@/components/kiosk/ListenButton";
 import { RedFlagOverlay } from "@/components/kiosk/RedFlagOverlay";
 import { useKiosk } from "@/lib/kiosk-hooks";
@@ -35,9 +36,7 @@ function Welcome() {
     <div className="kiosk-surface flex min-h-screen flex-col">
       <header className="mx-auto grid w-full max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-6 sm:px-8">
         <div className="flex min-w-0 items-center gap-4">
-          <span className="grid size-14 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
-            <HeartPulse className="size-8" />
-          </span>
+          <MediKioskLogo className="size-14" />
           <div className="min-w-0">
             <p className="truncate text-3xl font-extrabold leading-none">MediKiosk</p>
             <p className="truncate text-base text-muted-foreground">

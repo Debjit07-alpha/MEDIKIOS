@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { HeartPulse, HelpCircle, Home, Check } from "lucide-react";
+import { HelpCircle, Home, Check } from "lucide-react";
+import { MediKioskLogo } from "./MediKioskLogo";
 import { STEPS, type StepId, LANGUAGES } from "@/lib/kiosk-data";
 import { useKiosk, useLanguage } from "@/lib/kiosk-hooks";
 import { RedFlagOverlay } from "./RedFlagOverlay";
@@ -39,9 +40,7 @@ export function KioskShell({
       <header className="border-b border-border/70 bg-card/70 backdrop-blur">
         <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-3 sm:px-6">
           <Link to="/" className="flex min-w-0 items-center gap-3">
-            <span className="grid size-12 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
-              <HeartPulse className="size-7" />
-            </span>
+            <MediKioskLogo className="size-12" />
             <span className="min-w-0">
               <span className="block truncate text-2xl font-extrabold leading-none">MediKiosk</span>
               <span className="block truncate text-sm text-muted-foreground">
