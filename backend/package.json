@@ -2,11 +2,12 @@
   "name": "backend",
   "version": "1.0.0",
   "description": "MediKiosk Backend",
-  "main": "index.js",
+  "main": "dist/server.js",
   "scripts": {
-    "dev": "nodemon src/server.ts",
-    "start": "node src/server.ts"
-  },
+  "dev": "nodemon src/server.ts",
+  "build": "tsc",
+  "start": "node dist/server.js"
+},
   "keywords": [],
   "type": "commonjs",
   "dependencies": {
