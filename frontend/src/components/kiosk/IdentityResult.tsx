@@ -14,13 +14,7 @@ type Props = {
   onBack?: () => void;
 };
 
-export function IdentityResult({
-  method,
-  submit,
-  autoStart = false,
-  errorMessage,
-  onBack,
-}: Props) {
+export function IdentityResult({ method, submit, autoStart = false, errorMessage, onBack }: Props) {
   const { setPatient, clearIdentityMethod } = useKiosk();
   const { t } = useLanguage();
   const navigate = useNavigate();

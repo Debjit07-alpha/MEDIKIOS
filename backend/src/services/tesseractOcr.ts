@@ -42,6 +42,8 @@ export interface PreprocessInfo {
   originalSize?: { width: number; height: number };
   processedSize?: { width: number; height: number };
   format?: string;
+  /** Degrees the image was rotated before the winning OCR pass. */
+  rotation?: number;
 }
 
 export interface TesseractOcrResult {
@@ -55,6 +57,16 @@ export interface TesseractOcrResult {
 
 const MAX_DIMENSION = 2400;
 const OCR_TIMEOUT_MS = 120_000;
+
+// Confidence / length floors chosen from calibration on real upright and
+// rotated (90-degree-baked) prescription photos:
+//   upright   -> conf ~78 @ angle 0
+//   rotated   -> conf ~38 @ angle 0, conf ~79 @ correct rotation
+// So we accept a pass immediately when it is clearly good, otherwise we try
+// every rotation and keep the best one.
+const QUICK_ACCEPT_CONFIDENCE = 60;
+const ACCEPT_CONFIDENCE = 45;
+const MIN_TEXT_LENGTH = 20;
 
 let workerPromise: Promise<Worker> | null = null;
 let workerInvalidated = false;
@@ -136,28 +148,50 @@ async function preprocessImage(
 async function recognizeOnce(processed: Buffer): Promise<TesseractOcrResult> {
   const worker = await withTimeoutMs(getWorker(), OCR_TIMEOUT_MS);
   try {
-    const { data } = await withTimeoutMs(
-      worker.recognize(processed),
-      OCR_TIMEOUT_MS,
+    // The baseline pass uses the preprocessed image. If it is not clearly
+    // legible, the photo may be a sideways camera shot, so every rotation is
+    // tried and the best-scoring pass wins.
+    const base = await recognizeBuffer(worker, processed);
+    if (
+      !base.text ||
+      base.confidence >= QUICK_ACCEPT_CONFIDENCE &&
+        base.text.length >= MIN_TEXT_LENGTH
+    ) {
+      if (!base.text) {
+        throw new TesseractOcrError(
+          "NO_TEXT",
+          "No readable text was found in the document.",
+        );
+      }
+      return buildResult(base, 0);
+    }
+
+    const candidates: { text: string; confidence: number; rotation: number }[] =
+      [{ ...base, rotation: 0 }];
+    for (const rotation of [90, 180, 270]) {
+      const rotated = await sharp(processed).rotate(rotation).toBuffer();
+      candidates.push({
+        ...(await recognizeBuffer(worker, rotated)),
+        rotation,
+      });
+    }
+
+    const best = candidates.reduce((winner, candidate) =>
+      candidate.confidence > winner.confidence ? candidate : winner,
     );
-    const rawText = (data.text || "").replace(/\r\n/g, "\n").trim();
-    if (!rawText) {
+
+    if (
+      !best.text ||
+      best.confidence < ACCEPT_CONFIDENCE ||
+      best.text.length < MIN_TEXT_LENGTH
+    ) {
       throw new TesseractOcrError(
         "NO_TEXT",
         "No readable text was found in the document.",
       );
     }
-    return {
-      success: true,
-      rawText,
-      confidence:
-        typeof data.confidence === "number"
-          ? Math.round(data.confidence * 10) / 10
-          : 0,
-      provider: "tesseract",
-      pageCount: 1,
-      preprocessing: { applied: false },
-    };
+
+    return buildResult(best, best.rotation);
   } catch (error) {
     if (error instanceof TesseractOcrError) throw error;
     workerInvalidated = true;
@@ -167,6 +201,37 @@ async function recognizeOnce(processed: Buffer): Promise<TesseractOcrResult> {
       "The OCR engine could not read the document.",
     );
   }
+}
+
+function buildResult(
+  data: { text: string; confidence: number },
+  rotation: number,
+): TesseractOcrResult {
+  return {
+    success: true,
+    rawText: data.text.trim(),
+    confidence:
+      typeof data.confidence === "number"
+        ? Math.round(data.confidence * 10) / 10
+        : 0,
+    provider: "tesseract",
+    pageCount: 1,
+    preprocessing: { applied: false, rotation },
+  };
+}
+
+async function recognizeBuffer(
+  worker: Worker,
+  buffer: Buffer,
+): Promise<{ text: string; confidence: number }> {
+  const { data } = await withTimeoutMs(
+    worker.recognize(buffer),
+    OCR_TIMEOUT_MS,
+  );
+  return {
+    text: (data.text || "").replace(/\r\n/g, "\n").trim() as string,
+    confidence: typeof data.confidence === "number" ? data.confidence : 0,
+  };
 }
 
 // A single shared worker is safe to reuse, but concurrent calls on the same
@@ -196,6 +261,9 @@ export async function ocrWithTesseract(
   );
 
   const result = await run;
-  result.preprocessing = preprocessing;
+  result.preprocessing = {
+    ...preprocessing,
+    rotation: result.preprocessing.rotation ?? 0,
+  };
   return result;
 }

@@ -123,9 +123,7 @@ function DonePage() {
             <div className="flex flex-col items-center gap-4 rounded-4xl border-2 border-primary bg-primary-soft p-10 shadow-card">
               <Loader2 className="size-10 animate-spin text-primary" />
               <p className="text-xl font-bold">
-                {language === "en"
-                  ? "Loading doctor summary..."
-                  : t("loadingDoctorSummary")}
+                {language === "en" ? "Loading doctor summary..." : t("loadingDoctorSummary")}
               </p>
             </div>
           ) : doctorSummary ? (

@@ -27,9 +27,7 @@ export function buildSummary(
       const picked = answers[q.id] ?? [];
       const localized = localizeQuestion(q, language);
       const labels = new Map(localized.options.map((o) => [o.id, o.label]));
-      const value = picked.length
-        ? picked.map((id) => labels.get(id) ?? id).join(", ")
-        : fallback;
+      const value = picked.length ? picked.map((id) => labels.get(id) ?? id).join(", ") : fallback;
       return {
         qid: q.id,
         section: localized.section,

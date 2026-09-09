@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import {
   ArrowLeft,
+  ArrowRight,
   AlertTriangle,
   CheckCircle2,
   FileHeart,
@@ -13,18 +14,21 @@ import {
   Minimize2,
   Pill,
   RotateCcw,
+  Save,
   ScanSearch,
   Search,
   ShieldAlert,
   Stethoscope,
   Upload,
+  XCircle,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
 import { KioskShell, PageHeading } from "@/components/kiosk/KioskShell";
 import { ListenButton } from "@/components/kiosk/ListenButton";
-import { api, type OcrAnalyzeResponse, type OcrConfidence } from "@/lib/api";
-import { useLanguage } from "@/lib/kiosk-hooks";
+import { api, type OcrAnalyzeResponse, type OcrConfidence, type OcrDocumentType } from "@/lib/api";
+import { useKiosk, useLanguage } from "@/lib/kiosk-hooks";
+import type { DocKind } from "@/lib/kiosk-data";
 import type { TranslationKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -61,6 +65,26 @@ const FILTERS: { kind: FilterKind; key: TranslationKey }[] = [
   { kind: "procedures", key: "ocrFilterProcedures" },
   { kind: "diagnoses", key: "ocrFilterDiagnoses" },
 ];
+
+const DOC_TYPE_TO_KIND: Record<OcrDocumentType, DocKind> = {
+  prescription: "prescription",
+  blood_test_report: "lab",
+  urine_test_report: "lab",
+  glucose_or_sugar_report: "lab",
+  lab_report: "lab",
+  medical_report: "discharge",
+  procedure_report: "discharge",
+  surgical_document: "discharge",
+  other_medical_document: "discharge",
+  unknown: "discharge",
+};
+
+function makeSaveKey(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 function ConfidenceBadge({ level }: { level: OcrConfidence }) {
   const { t } = useLanguage();
@@ -102,7 +126,7 @@ function DetailRow({ label, value }: { label: string; value: string | null }) {
   if (!value) return null;
   return (
     <div className="flex flex-wrap gap-x-3 gap-y-1">
-      <dt className="min-w-[130px] text-sm font-bold uppercase tracking-wider text-muted-foreground">
+      <dt className="min-w-32.5 text-sm font-bold uppercase tracking-wider text-muted-foreground">
         {label}
       </dt>
       <dd className="text-lg font-semibold">{value}</dd>
@@ -157,8 +181,8 @@ function InvestigationCard({
       </div>
       <dl className="mt-4 grid gap-3">
         {investigation.value ? (
-          <div className="flex flex-wrap gap-x-3 gap-y-1">
-            <dt className="min-w-[130px] text-sm font-bold uppercase tracking-wider text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <dt className="min-w-32.5 text-sm font-bold uppercase tracking-wider text-muted-foreground">
               {t("ocrResult")}
             </dt>
             <dd className="text-2xl font-extrabold text-primary">
@@ -171,14 +195,28 @@ function InvestigationCard({
             </dd>
           </div>
         ) : null}
+        {investigation.flag ? (
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
+            <dt className="min-w-32.5 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+              {t("ocrOutOfRange")}
+            </dt>
+            <dd>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive-soft px-3 py-1 text-sm font-bold text-destructive">
+                <AlertTriangle className="size-4" aria-hidden />
+                {investigation.flag}
+              </span>
+            </dd>
+          </div>
+        ) : null}
         <div className="flex flex-wrap gap-x-3 gap-y-1">
-          <dt className="min-w-[130px] text-sm font-bold uppercase tracking-wider text-muted-foreground">
+          <dt className="min-w-32.5 text-sm font-bold uppercase tracking-wider text-muted-foreground">
             {t("ocrReferenceRange")}
           </dt>
           <dd className="text-lg font-semibold">
             {investigation.referenceRange ?? t("ocrNotProvided")}
           </dd>
         </div>
+        <DetailRow label={t("ocrDate")} value={investigation.date} />
       </dl>
       <Evidence evidence={investigation.evidence} />
     </article>
@@ -217,6 +255,7 @@ function itemMatches(query: string, ...fields: (string | null | undefined)[]): b
 
 function OcrLabPage() {
   const navigate = useNavigate();
+  const { patient, addDocument } = useKiosk();
   const { t } = useLanguage();
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -227,9 +266,13 @@ function OcrLabPage() {
   const [filter, setFilter] = useState<FilterKind>("all");
   const [zoom, setZoom] = useState<number | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "failed">("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [retryState, setRetryState] = useState<"idle" | "retrying" | "failed">("idle");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const stageTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const saveKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -244,6 +287,10 @@ function OcrLabPage() {
     setFile(selected);
     setResult(null);
     setError(null);
+    setSaveError(null);
+    setSaveState("idle");
+    setRetryState("idle");
+    saveKeyRef.current = null;
     setQuery("");
     setFilter("all");
     setStage(0);
@@ -280,10 +327,75 @@ function OcrLabPage() {
     await runAnalysis(selected);
   };
 
+  // Gemini-only retry: Tesseract already succeeded, so the extracted
+  // text and the original image are sent straight to the analysis stage.
+  // Manual and single-shot — never automatic, never a loop.
+  const retryDetailedAnalysis = async () => {
+    const rawText = result?.ocr?.rawText?.trim() || "";
+    if (!file || !rawText || retryState === "retrying") return;
+    setRetryState("retrying");
+    try {
+      const response = await api.ocr.retryAnalysis(file, rawText);
+      setResult(response);
+      setRetryState("idle");
+    } catch (err) {
+      console.error("Detailed analysis retry failed:", err);
+      setRetryState("failed");
+    }
+  };
+
+  const handleSave = async () => {
+    const rawText = result?.ocr?.rawText || result?.analysis?.rawOcrText || "";
+    if (!file || !result || !rawText.trim()) return;
+    if (saveState === "saving" || saveState === "saved") return;
+
+    if (!patient) {
+      setSaveError(t("ocrSaveNeedsPatient"));
+      setSaveState("failed");
+      return;
+    }
+
+    saveKeyRef.current ??= makeSaveKey();
+    setSaveError(null);
+    setSaveState("saving");
+
+    // OCR-only save when Gemini was unavailable: document + raw OCR text
+    // are stored with analysis null. Nothing is invented.
+    const documentType = result.analysis?.documentType ?? "unknown";
+
+    try {
+      await api.ocr.saveDocument({
+        patientId: patient.uhid,
+        file,
+        saveKey: saveKeyRef.current,
+        documentType,
+        rawOcrText: rawText,
+        analysis: result.analysis ?? null,
+        analysisStatus:
+          result.analysisStatus ?? (result.analysis ? "ready" : "temporarily_unavailable"),
+        warnings: result.warnings ?? [],
+      });
+
+      addDocument(DOC_TYPE_TO_KIND[documentType]);
+      setSaveState("saved");
+
+      // Navigate ONLY after the backend confirmed the save.
+      void navigate({ to: "/timeline" });
+    } catch (err) {
+      console.error("Save failed:", err);
+      setSaveState("failed");
+      setSaveError(t("ocrSaveFailed"));
+    }
+  };
+
   const analysis = result?.analysis ?? null;
+  const ocrText = result?.ocr?.rawText || "";
+  const hasOcrText = ocrText.trim().length > 0;
 
   const spokenSummary = useMemo(() => {
-    if (!analysis) return "";
+    // When detailed organization is unavailable, read-aloud still works:
+    // it reads the extracted document text instead of nothing.
+    if (!analysis) return ocrText;
     const lines: string[] = [
       `This is a ${(analysis.documentType || "medical document").replace(/_/g, " ")}.`,
     ];
@@ -305,7 +417,7 @@ function OcrLabPage() {
       lines.push(`Instructions: ${analysis.instructions.join(". ")}.`);
     }
     return lines.join(" ");
-  }, [analysis]);
+  }, [analysis, ocrText]);
 
   const medicines = useMemo(
     () =>
@@ -359,7 +471,7 @@ function OcrLabPage() {
     <div
       className={cn(
         "relative overflow-hidden rounded-2xl border-2 border-border bg-muted",
-        fixed ? "h-[26rem]" : "h-full",
+        fixed ? "h-104" : "h-full",
       )}
     >
       {previewUrl ? (
@@ -454,249 +566,338 @@ function OcrLabPage() {
           </ol>
         </section>
       ) : result ? (
-        <div className="animate-rise grid gap-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
-          {/* Image preview */}
-          <aside className="lg:sticky lg:top-6 lg:self-start">
-            <div className="rounded-4xl border-2 border-border bg-card p-5 shadow-card">
-              <h3 className="flex items-center gap-2 text-xl font-extrabold">
-                <FileHeart className="size-6 text-primary" aria-hidden /> {t("ocrOriginalDocument")}
-              </h3>
-              {renderImage({ fixed: true })}
-              <div
-                className="mt-4 flex flex-wrap items-center gap-2"
-                role="group"
-                aria-label={t("ocrOriginalDocument")}
-              >
-                <button
-                  type="button"
-                  onClick={() => setZoom((z) => Math.min(3, (z ?? 1) + 0.25))}
-                  className="grid size-11 place-items-center rounded-full border-2 border-border bg-card"
-                  aria-label={t("ocrZoomIn")}
+        <>
+          <div className="animate-rise grid gap-6 pb-40 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
+            {/* Image preview */}
+            <aside className="lg:sticky lg:top-6 lg:self-start">
+              <div className="rounded-4xl border-2 border-border bg-card p-5 shadow-card">
+                <h3 className="flex items-center gap-2 text-xl font-extrabold">
+                  <FileHeart className="size-6 text-primary" aria-hidden />{" "}
+                  {t("ocrOriginalDocument")}
+                </h3>
+                {renderImage({ fixed: true })}
+                <div
+                  className="mt-4 flex flex-wrap items-center gap-2"
+                  role="group"
+                  aria-label={t("ocrOriginalDocument")}
                 >
-                  <ZoomIn className="size-5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setZoom((z) => (z === null || z - 0.25 < 0.25 ? null : z - 0.25))}
-                  className="grid size-11 place-items-center rounded-full border-2 border-border bg-card"
-                  aria-label={t("ocrZoomOut")}
-                >
-                  <ZoomOut className="size-5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setZoom(null)}
-                  className={cn(
-                    "min-h-11 rounded-full border-2 px-4 text-sm font-bold",
-                    zoom === null
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-card",
-                  )}
-                >
-                  {t("ocrFit")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFullscreen(true)}
-                  className="grid size-11 place-items-center rounded-full border-2 border-border bg-card"
-                  aria-label={t("ocrFullscreen")}
-                >
-                  <Maximize2 className="size-5" />
-                </button>
-              </div>
-            </div>
-          </aside>
-
-          {/* Results */}
-          <main>
-            <div className="mb-4 flex flex-col gap-3 rounded-2xl border-2 border-warning/40 bg-warning-soft p-4">
-              <p className="flex items-center gap-2 text-base font-bold text-warning-foreground">
-                <ShieldAlert className="size-5 shrink-0" aria-hidden />
-                {t("ocrVerifyInfo")}
-              </p>
-              {result.warning ? (
-                <p className="text-base font-semibold text-warning-foreground">{result.warning}</p>
-              ) : null}
-            </div>
-
-            {result.documentId ? (
-              <p className="mb-4 flex items-center gap-2 text-base font-semibold text-success">
-                <CheckCircle2 className="size-5 shrink-0" aria-hidden />
-                {t("ocrSavedToRecords")}
-              </p>
-            ) : null}
-
-            {!analysis ? (
-              <div className="rounded-4xl border-2 border-border bg-card p-8 text-center shadow-card">
-                <ScanSearch className="mx-auto size-14 text-primary" aria-hidden />
-                <h2 className="mt-4 text-2xl font-extrabold">{t("ocrUnavailableTitle")}</h2>
-                <p className="mt-2 text-lg text-muted-foreground">{t("ocrUnavailableText")}</p>
-                <button
-                  type="button"
-                  onClick={() => file && void runAnalysis(file)}
-                  className="mt-6 inline-flex min-h-14 items-center gap-2 rounded-full bg-primary px-8 text-lg font-extrabold text-primary-foreground shadow-lift"
-                >
-                  <RotateCcw className="size-5" /> {t("ocrTryAgain")}
-                </button>
-              </div>
-            ) : null}
-
-            {analysis ? (
-              <>
-                <section aria-label={t("ocrMedicalInformation")}>
-                  <h2 className="flex items-center gap-2 text-3xl font-extrabold">
-                    <ScanSearch className="size-8 text-primary" aria-hidden />
-                    {t("ocrMedicalInformation")}
-                  </h2>
-                  <div className="mt-4 flex flex-wrap items-center gap-3 rounded-3xl border-2 border-border bg-card p-4 shadow-card">
-                    <div className="relative min-w-0 flex-1">
-                      <Search
-                        className="pointer-events-none absolute left-4 top-1/2 size-6 -translate-y-1/2 text-muted-foreground"
-                        aria-hidden
-                      />
-                      <input
-                        type="search"
-                        value={query}
-                        onChange={(event) => setQuery(event.target.value)}
-                        placeholder={t("ocrSearchPlaceholder")}
-                        aria-label={t("ocrSearchPlaceholder")}
-                        className="w-full rounded-full border-2 border-border bg-background py-4 pl-14 pr-4 text-lg outline-none focus:border-primary"
-                      />
-                    </div>
-                    <div
-                      className="flex flex-wrap gap-2"
-                      role="group"
-                      aria-label={t("ocrFilterAll")}
-                    >
-                      {FILTERS.map((chip) => (
-                        <button
-                          key={chip.kind}
-                          type="button"
-                          onClick={() => setFilter(chip.kind)}
-                          aria-pressed={filter === chip.kind}
-                          className={cn(
-                            "min-h-11 rounded-full border-2 px-4 text-base font-bold",
-                            filter === chip.kind
-                              ? "border-primary bg-primary text-primary-foreground"
-                              : "border-border bg-card text-foreground",
-                          )}
-                        >
-                          {t(chip.key)}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </section>
-
-                {result.ocr?.rawText ? (
-                  <div className="mt-4">
-                    <ListenButton text={spokenSummary} label={t("ocrReadAloud")} />
-                  </div>
-                ) : null}
-
-                {showSection("medicines") && medicines.length ? (
-                  <section aria-label={t("ocrMedicines")} className="mt-6">
-                    <h2 className="text-2xl font-extrabold">{t("ocrMedicines")}</h2>
-                    <div className="mt-3 grid gap-4 xl:grid-cols-2">
-                      {medicines.map((medicine) => (
-                        <MedicineCard key={medicine.name} medicine={medicine} />
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
-
-                {showSection("investigations") && investigations.length ? (
-                  <section aria-label={t("ocrTestResults")} className="mt-6">
-                    <h2 className="text-2xl font-extrabold">{t("ocrTestResults")}</h2>
-                    <div className="mt-3 grid gap-4 xl:grid-cols-2">
-                      {investigations.map((investigation) => (
-                        <InvestigationCard key={investigation.test} investigation={investigation} />
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
-
-                {showSection("procedures") && procedures.length ? (
-                  <section aria-label={t("ocrProcedures")} className="mt-6">
-                    <h2 className="text-2xl font-extrabold">{t("ocrProcedures")}</h2>
-                    <div className="mt-3 grid gap-4 xl:grid-cols-2">
-                      {procedures.map((procedure) => (
-                        <ProcedureCard key={procedure.name} procedure={procedure} />
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
-
-                {showSection("diagnoses") && (
-                  <section aria-label={t("ocrDiagnosesDocumented")} className="mt-6">
-                    <h2 className="flex items-center gap-2 text-2xl font-extrabold">
-                      <Stethoscope className="size-7 text-primary" aria-hidden />
-                      {t("ocrDiagnosesDocumented")}
-                    </h2>
-                    {diagnoses.length ? (
-                      <div className="mt-3 grid gap-4 xl:grid-cols-2">
-                        {diagnoses.map((diagnosis) => (
-                          <article
-                            key={diagnosis.name}
-                            className="rounded-3xl border-2 border-border bg-card p-5 shadow-card"
-                          >
-                            <div className="flex flex-wrap items-start justify-between gap-3">
-                              <h3 className="text-2xl font-extrabold">{diagnosis.name}</h3>
-                              <ConfidenceBadge level={diagnosis.confidence} />
-                            </div>
-                            <Evidence evidence={diagnosis.evidence} />
-                          </article>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="mt-3 rounded-3xl border-2 border-border bg-card p-6 text-lg text-muted-foreground shadow-card">
-                        {t("ocrNoDiagnosis")}
-                      </p>
+                  <button
+                    type="button"
+                    onClick={() => setZoom((z) => Math.min(3, (z ?? 1) + 0.25))}
+                    className="grid size-11 place-items-center rounded-full border-2 border-border bg-card"
+                    aria-label={t("ocrZoomIn")}
+                  >
+                    <ZoomIn className="size-5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setZoom((z) => (z === null || z - 0.25 < 0.25 ? null : z - 0.25))
+                    }
+                    className="grid size-11 place-items-center rounded-full border-2 border-border bg-card"
+                    aria-label={t("ocrZoomOut")}
+                  >
+                    <ZoomOut className="size-5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setZoom(null)}
+                    className={cn(
+                      "min-h-11 rounded-full border-2 px-4 text-sm font-bold",
+                      zoom === null
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-card",
                     )}
-                  </section>
-                )}
+                  >
+                    {t("ocrFit")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFullscreen(true)}
+                    className="grid size-11 place-items-center rounded-full border-2 border-border bg-card"
+                    aria-label={t("ocrFullscreen")}
+                  >
+                    <Maximize2 className="size-5" />
+                  </button>
+                </div>
+              </div>
+            </aside>
 
-                {showSection("all") && instructions.length ? (
-                  <section aria-label={t("ocrAdditionalInstructions")} className="mt-6">
-                    <h2 className="flex items-center gap-2 text-2xl font-extrabold">
-                      <ListChecks className="size-7 text-primary" aria-hidden />
-                      {t("ocrAdditionalInstructions")}
-                    </h2>
-                    <ul className="mt-3 grid gap-2">
-                      {instructions.map((instruction, index) => (
-                        <li
-                          key={`${instruction}-${index}`}
-                          className="flex items-start gap-3 rounded-2xl border-2 border-border bg-card p-4 text-lg font-semibold shadow-card"
-                        >
-                          <span
-                            className="mt-1.5 size-2 shrink-0 rounded-full bg-primary"
-                            aria-hidden
-                          />
-                          {instruction}
-                        </li>
-                      ))}
-                    </ul>
-                  </section>
-                ) : null}
-
-                {!hasResults && (query || filter !== "all") ? (
-                  <p className="mt-6 text-lg text-muted-foreground">
-                    {t("ocrNoMatches").replace("{query}", query)}
+            {/* Results */}
+            <main>
+              <div className="mb-4 flex flex-col gap-3 rounded-2xl border-2 border-warning/40 bg-warning-soft p-4">
+                <p className="flex items-center gap-2 text-base font-bold text-warning-foreground">
+                  <ShieldAlert className="size-5 shrink-0" aria-hidden />
+                  {t("ocrVerifyInfo")}
+                </p>
+                {result.warning ? (
+                  <p className="text-base font-semibold text-warning-foreground">
+                    {result.warning}
                   </p>
                 ) : null}
+              </div>
 
-                <details className="mt-6 rounded-3xl border-2 border-border bg-card p-5 shadow-card">
-                  <summary className="cursor-pointer text-lg font-bold">
-                    {t("ocrOriginalText")}
-                  </summary>
-                  <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap rounded-2xl bg-muted p-4 text-base">
-                    {result.ocr?.rawText || t("ocrOriginalNoText")}
+              {!analysis && hasOcrText ? (
+                <section
+                  aria-label={t("ocrExtractedText")}
+                  className="rounded-4xl border-2 border-border bg-card p-8 shadow-card"
+                >
+                  <h2 className="flex items-center gap-2 text-2xl font-extrabold">
+                    <ScanSearch className="size-8 text-primary" aria-hidden />
+                    {t("ocrTextExtractedTitle")}
+                  </h2>
+                  <p className="mt-2 text-lg text-muted-foreground">{t("ocrTextExtractedBody")}</p>
+                  <div className="mt-4">
+                    <ListenButton text={ocrText} label={t("ocrReadAloud")} />
+                  </div>
+                  <h3 className="mt-6 text-xl font-extrabold">{t("ocrExtractedText")}</h3>
+                  <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap rounded-2xl bg-muted p-4 text-left text-base">
+                    {ocrText}
                   </pre>
-                </details>
-              </>
-            ) : null}
-          </main>
-        </div>
+                  <button
+                    type="button"
+                    onClick={() => void retryDetailedAnalysis()}
+                    disabled={retryState === "retrying"}
+                    className="mt-6 inline-flex min-h-14 items-center gap-2 rounded-full bg-primary px-8 text-lg font-extrabold text-primary-foreground shadow-lift disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {retryState === "retrying" ? (
+                      <>
+                        <Loader2 className="size-5 animate-spin" aria-hidden />{" "}
+                        {t("ocrRetryingAnalysis")}
+                      </>
+                    ) : (
+                      <>
+                        <RotateCcw className="size-5" /> {t("ocrTryDetailedAgain")}
+                      </>
+                    )}
+                  </button>
+                  {retryState === "failed" ? (
+                    <p role="alert" className="mt-3 text-lg text-muted-foreground">
+                      {t("ocrRetryStillUnavailable")}
+                    </p>
+                  ) : null}
+                </section>
+              ) : null}
+
+              {!analysis && !hasOcrText ? (
+                <div className="rounded-4xl border-2 border-border bg-card p-8 text-center shadow-card">
+                  <ScanSearch className="mx-auto size-14 text-primary" aria-hidden />
+                  <h2 className="mt-4 text-2xl font-extrabold">{t("ocrUnavailableTitle")}</h2>
+                  <p className="mt-2 text-lg text-muted-foreground">{t("ocrUnavailableText")}</p>
+                  <button
+                    type="button"
+                    onClick={() => file && void runAnalysis(file)}
+                    className="mt-6 inline-flex min-h-14 items-center gap-2 rounded-full bg-primary px-8 text-lg font-extrabold text-primary-foreground shadow-lift"
+                  >
+                    <RotateCcw className="size-5" /> {t("ocrTryAgain")}
+                  </button>
+                </div>
+              ) : null}
+
+              {analysis ? (
+                <>
+                  <section aria-label={t("ocrMedicalInformation")}>
+                    <h2 className="flex items-center gap-2 text-3xl font-extrabold">
+                      <ScanSearch className="size-8 text-primary" aria-hidden />
+                      {t("ocrMedicalInformation")}
+                    </h2>
+                    <div className="mt-4 flex flex-wrap items-center gap-3 rounded-3xl border-2 border-border bg-card p-4 shadow-card">
+                      <div className="relative min-w-0 flex-1">
+                        <Search
+                          className="pointer-events-none absolute left-4 top-1/2 size-6 -translate-y-1/2 text-muted-foreground"
+                          aria-hidden
+                        />
+                        <input
+                          type="search"
+                          value={query}
+                          onChange={(event) => setQuery(event.target.value)}
+                          placeholder={t("ocrSearchPlaceholder")}
+                          aria-label={t("ocrSearchPlaceholder")}
+                          className="w-full rounded-full border-2 border-border bg-background py-4 pl-14 pr-4 text-lg outline-none focus:border-primary"
+                        />
+                      </div>
+                      <div
+                        className="flex flex-wrap gap-2"
+                        role="group"
+                        aria-label={t("ocrFilterAll")}
+                      >
+                        {FILTERS.map((chip) => (
+                          <button
+                            key={chip.kind}
+                            type="button"
+                            onClick={() => setFilter(chip.kind)}
+                            aria-pressed={filter === chip.kind}
+                            className={cn(
+                              "min-h-11 rounded-full border-2 px-4 text-base font-bold",
+                              filter === chip.kind
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-border bg-card text-foreground",
+                            )}
+                          >
+                            {t(chip.key)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </section>
+
+                  {result.ocr?.rawText ? (
+                    <div className="mt-4">
+                      <ListenButton text={spokenSummary} label={t("ocrReadAloud")} />
+                    </div>
+                  ) : null}
+
+                  {showSection("medicines") && medicines.length ? (
+                    <section aria-label={t("ocrMedicines")} className="mt-6">
+                      <h2 className="text-2xl font-extrabold">{t("ocrMedicines")}</h2>
+                      <div className="mt-3 grid gap-4 xl:grid-cols-2">
+                        {medicines.map((medicine) => (
+                          <MedicineCard key={medicine.name} medicine={medicine} />
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+
+                  {showSection("investigations") && investigations.length ? (
+                    <section aria-label={t("ocrTestResults")} className="mt-6">
+                      <h2 className="text-2xl font-extrabold">{t("ocrTestResults")}</h2>
+                      <div className="mt-3 grid gap-4 xl:grid-cols-2">
+                        {investigations.map((investigation) => (
+                          <InvestigationCard
+                            key={investigation.test}
+                            investigation={investigation}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+
+                  {showSection("procedures") && procedures.length ? (
+                    <section aria-label={t("ocrProcedures")} className="mt-6">
+                      <h2 className="text-2xl font-extrabold">{t("ocrProcedures")}</h2>
+                      <div className="mt-3 grid gap-4 xl:grid-cols-2">
+                        {procedures.map((procedure) => (
+                          <ProcedureCard key={procedure.name} procedure={procedure} />
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+
+                  {showSection("diagnoses") && (
+                    <section aria-label={t("ocrDiagnosesDocumented")} className="mt-6">
+                      <h2 className="flex items-center gap-2 text-2xl font-extrabold">
+                        <Stethoscope className="size-7 text-primary" aria-hidden />
+                        {t("ocrDiagnosesDocumented")}
+                      </h2>
+                      {diagnoses.length ? (
+                        <div className="mt-3 grid gap-4 xl:grid-cols-2">
+                          {diagnoses.map((diagnosis) => (
+                            <article
+                              key={diagnosis.name}
+                              className="rounded-3xl border-2 border-border bg-card p-5 shadow-card"
+                            >
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <h3 className="text-2xl font-extrabold">{diagnosis.name}</h3>
+                                <ConfidenceBadge level={diagnosis.confidence} />
+                              </div>
+                              <Evidence evidence={diagnosis.evidence} />
+                            </article>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="mt-3 rounded-3xl border-2 border-border bg-card p-6 text-lg text-muted-foreground shadow-card">
+                          {t("ocrNoDiagnosis")}
+                        </p>
+                      )}
+                    </section>
+                  )}
+
+                  {showSection("all") && instructions.length ? (
+                    <section aria-label={t("ocrAdditionalInstructions")} className="mt-6">
+                      <h2 className="flex items-center gap-2 text-2xl font-extrabold">
+                        <ListChecks className="size-7 text-primary" aria-hidden />
+                        {t("ocrAdditionalInstructions")}
+                      </h2>
+                      <ul className="mt-3 grid gap-2">
+                        {instructions.map((instruction, index) => (
+                          <li
+                            key={`${instruction}-${index}`}
+                            className="flex items-start gap-3 rounded-2xl border-2 border-border bg-card p-4 text-lg font-semibold shadow-card"
+                          >
+                            <span
+                              className="mt-1.5 size-2 shrink-0 rounded-full bg-primary"
+                              aria-hidden
+                            />
+                            {instruction}
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  ) : null}
+
+                  {!hasResults && (query || filter !== "all") ? (
+                    <p className="mt-6 text-lg text-muted-foreground">
+                      {t("ocrNoMatches").replace("{query}", query)}
+                    </p>
+                  ) : null}
+
+                  <details className="mt-6 rounded-3xl border-2 border-border bg-card p-5 shadow-card">
+                    <summary className="cursor-pointer text-lg font-bold">
+                      {t("ocrOriginalText")}
+                    </summary>
+                    <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap rounded-2xl bg-muted p-4 text-base">
+                      {result.ocr?.rawText || t("ocrOriginalNoText")}
+                    </pre>
+                  </details>
+                </>
+              ) : null}
+            </main>
+          </div>
+
+          {analysis || hasOcrText ? (
+            <div className="fixed inset-x-0 bottom-0 z-40 border-t-2 border-border bg-card/95 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 shadow-lift backdrop-blur">
+              <div className="mx-auto flex max-w-5xl flex-col gap-3">
+                {saveError ? (
+                  <p
+                    role="alert"
+                    className="flex items-center gap-2 rounded-2xl border-2 border-destructive/40 bg-destructive-soft px-4 py-3 text-base font-bold text-destructive"
+                  >
+                    <XCircle className="size-5 shrink-0" aria-hidden /> {saveError}
+                  </p>
+                ) : null}
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-base font-semibold text-muted-foreground">
+                    {t("ocrSaveHint")}
+                  </p>
+                  {saveState === "saved" ? (
+                    <p className="flex items-center gap-2 rounded-full bg-success-soft px-5 py-3 text-lg font-extrabold text-success">
+                      <CheckCircle2 className="size-6" aria-hidden /> {t("ocrSaveSuccess")}
+                    </p>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void handleSave()}
+                      disabled={saveState === "saving"}
+                      aria-label={t("ocrSaveContinue")}
+                      className="inline-flex min-h-16 items-center gap-3 rounded-full bg-primary px-10 text-2xl font-extrabold text-primary-foreground shadow-lift disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {saveState === "saving" ? (
+                        <>
+                          <Loader2 className="size-7 animate-spin" aria-hidden /> {t("ocrSaving")}
+                        </>
+                      ) : (
+                        <>
+                          <Save className="size-7" aria-hidden /> {t("ocrSaveContinue")}
+                          <ArrowRight className="size-7" aria-hidden />
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </>
       ) : (
         <section
           aria-label={t("ocrUploadTitle")}

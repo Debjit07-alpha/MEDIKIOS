@@ -264,6 +264,7 @@ export const translationKeys = [
   "ocrResult",
   "ocrReferenceRange",
   "ocrNotProvided",
+  "ocrOutOfRange",
   "ocrDetails",
   "ocrDate",
   "ocrEvidence",
@@ -290,6 +291,18 @@ export const translationKeys = [
   "ocrBackToDocs",
   "ocrEntryTitle",
   "ocrEntrySubtitle",
+  "ocrSaveContinue",
+  "ocrSaving",
+  "ocrSaveSuccess",
+  "ocrSaveFailed",
+  "ocrSaveNeedsPatient",
+  "ocrSaveHint",
+  "ocrTextExtractedTitle",
+  "ocrTextExtractedBody",
+  "ocrExtractedText",
+  "ocrTryDetailedAgain",
+  "ocrRetryingAnalysis",
+  "ocrRetryStillUnavailable",
 ] as const;
 
 export type TranslationKey = (typeof translationKeys)[number];
@@ -569,6 +582,7 @@ const english: TranslationTable = {
   ocrResult: "Result",
   ocrReferenceRange: "Reference range",
   ocrNotProvided: "Not shown on this document",
+  ocrOutOfRange: "Marked outside the normal range",
   ocrDetails: "Details",
   ocrDate: "Date",
   ocrEvidence: "Seen on the document",
@@ -596,6 +610,21 @@ const english: TranslationTable = {
   ocrBackToDocs: "Back to documents",
   ocrEntryTitle: "Read a document you already have",
   ocrEntrySubtitle: "Upload a photo of a prescription or medical document from your device.",
+  ocrSaveContinue: "Save & Continue",
+  ocrSaving: "Saving...",
+  ocrSaveSuccess: "Saved to your health records.",
+  ocrSaveFailed: "Unable to save the document. Please try again.",
+  ocrSaveNeedsPatient:
+    "Please finish confirming your identity first, so your document can be saved.",
+  ocrSaveHint: "Your document is ready. Review the results above and save it to your records.",
+  ocrTextExtractedTitle: "Document text extracted",
+  ocrTextExtractedBody:
+    "Detailed organization is temporarily unavailable right now. You can review the extracted text below — and you can still save your document.",
+  ocrExtractedText: "Extracted document text",
+  ocrTryDetailedAgain: "Try detailed analysis again",
+  ocrRetryingAnalysis: "Preparing detailed information…",
+  ocrRetryStillUnavailable:
+    "Detailed analysis is still unavailable. Your extracted text is shown above, and you can save and continue.",
 };
 
 const translations: Partial<Record<LanguageCode, Partial<TranslationTable>>> = {
@@ -1500,6 +1529,13 @@ const ocrReaderTranslations: Partial<Record<LanguageCode, Partial<TranslationTab
     ocrBackToDocs: "दस्तावेज़ों पर वापस",
     ocrEntryTitle: "पहले से मौजूद दस्तावेज़ पढ़ें",
     ocrEntrySubtitle: "अपने डिवाइस से प्रिस्क्रिप्शन या मेडिकल दस्तावेज़ की फोटो अपलोड करें।",
+    ocrSaveContinue: "सहेजें और आगे बढ़ें",
+    ocrSaving: "सहेजा जा रहा है...",
+    ocrSaveSuccess: "आपके स्वास्थ्य रिकॉर्ड में सहेजा गया।",
+    ocrSaveFailed: "दस्तावेज़ को सहेज नहीं पाए। कृपया फिर से प्रयास करें।",
+    ocrSaveNeedsPatient: "पहले अपनी पहचान की पुष्टि करें, ताकि आपका दस्तावेज़ सहेजा जा सके।",
+    ocrSaveHint: "आपका दस्तावेज़ तैयार है। ऊपर दी गई जानकारी देखें और उसे सहेजें।",
+    ocrOutOfRange: "सामान्य सीमा से बाहर चिह्नित",
   },
   mr: {
     ocrReaderTitle: "मेडिकल दस्तऐवज वाचक",
@@ -1573,6 +1609,13 @@ const ocrReaderTranslations: Partial<Record<LanguageCode, Partial<TranslationTab
     ocrBackToDocs: "दस्तऐवजांवर परत",
     ocrEntryTitle: "तुमच्याकडे असलेला दस्तऐवज वाचा",
     ocrEntrySubtitle: "तुमच्या डिव्हाइसमधून प्रिस्क्रिप्शन किंवा मेडिकल दस्तऐवजाचा फोटो अपलोड करा.",
+    ocrSaveContinue: "जतन करा आणि पुढे जा",
+    ocrSaving: "जतन होत आहे...",
+    ocrSaveSuccess: "तुमच्या आरोग्य नोंदीत जतन केले.",
+    ocrSaveFailed: "दस्तऐवज जतन करता आले नाही. कृपया पुन्हा प्रयत्न करा.",
+    ocrSaveNeedsPatient: "तुमची ओळख आधी पक्की करा, जेणेकरून तुमचा दस्तऐवज जतन होईल.",
+    ocrSaveHint: "तुमचा दस्तऐवज तयार आहे. वरील माहिती पहा आणि जतन करा.",
+    ocrOutOfRange: "सामान्य श्रेणीबाहेर चिन्हांकित",
   },
   bn: {
     ocrReaderTitle: "মেডিকেল ডকুমেন্ট রিডার",
@@ -1646,6 +1689,13 @@ const ocrReaderTranslations: Partial<Record<LanguageCode, Partial<TranslationTab
     ocrBackToDocs: "ডকুমেন্টে ফিরে যান",
     ocrEntryTitle: "আপনার কাছে থাকা ডকুমেন্ট পড়ুন",
     ocrEntrySubtitle: "আপনার ডিভাইস থেকে প্রেসক্রিপশন বা মেডিকেল ডকুমেন্টের ছবি আপলোড করুন।",
+    ocrSaveContinue: "সংরক্ষণ করুন এবং এগিয়ে যান",
+    ocrSaving: "সংরক্ষণ হচ্ছে...",
+    ocrSaveSuccess: "আপনার স্বাস্থ্য রেকর্ডে সংরক্ষিত হয়েছে।",
+    ocrSaveFailed: "ডকুমেন্টটি সংরক্ষণ করা যায়নি। আবার চেষ্টা করুন।",
+    ocrSaveNeedsPatient: "আগে আপনার পরিচয় নিশ্চিত করুন, যাতে আপনার ডকুমেন্ট সংরক্ষণ করা যায়।",
+    ocrSaveHint: "আপনার ডকুমেন্ট প্রস্তুত। উপরের তথ্য দেখে সংরক্ষণ করুন।",
+    ocrOutOfRange: "স্বাভাবিক সীমার বাইরে চিহ্নিত",
   },
   ta: {
     ocrReaderTitle: "மருத்துவ ஆவண வாசிப்பான்",
@@ -1724,6 +1774,14 @@ const ocrReaderTranslations: Partial<Record<LanguageCode, Partial<TranslationTab
     ocrEntryTitle: "உங்களிடம் உள்ள ஆவணத்தைப் படிக்கவும்",
     ocrEntrySubtitle:
       "உங்கள் சாதனத்திலிருந்து மருந்துச்சீட்டு அல்லது மருத்துவ ஆவணத்தின் புகைப்படத்தைப் பதிவேற்றவும்.",
+    ocrSaveContinue: "சேமித்து தொடரவும்",
+    ocrSaving: "சேமிக்கிறது...",
+    ocrSaveSuccess: "உங்கள் சுகாதாரப் பதிவுகளில் சேமிக்கப்பட்டது.",
+    ocrSaveFailed: "ஆவணத்தைச் சேமிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
+    ocrSaveNeedsPatient:
+      "முதலில் உங்கள் அடையாளத்தை உறுதிப்படுத்தவும், பிறகு உங்கள் ஆவணத்தைச் சேமிக்க முடியும்.",
+    ocrSaveHint: "உங்கள் ஆவணம் தயாராக உள்ளது. மேலே உள்ள தகவலைப் பார்த்து சேமிக்கவும்.",
+    ocrOutOfRange: "இயல்பு வரம்புக்கு வெளியே குறிக்கப்பட்டது",
   },
   te: {
     ocrReaderTitle: "వైద్య పత్ర రీడర్",
@@ -1799,6 +1857,13 @@ const ocrReaderTranslations: Partial<Record<LanguageCode, Partial<TranslationTab
     ocrEntryTitle: "మీ వద్ద ఉన్న పత్రాన్ని చదవండి",
     ocrEntrySubtitle:
       "మీ పరికరం నుండి ప్రిస్క్రిప్షన్ లేదా వైద్య పత్రం యొక్క ఫోటోను అప్‌లోడ్ చేయండి.",
+    ocrSaveContinue: "సేవ్ చేసి కొనసాగండి",
+    ocrSaving: "సేవ్ చేస్తోంది...",
+    ocrSaveSuccess: "మీ ఆరోగ్య రికార్డులలో సేవ్ చేయబడింది.",
+    ocrSaveFailed: "పత్రాన్ని సేవ్ చేయలేకపోయాము. దయచేసి మళ్లీ ప్రయత్నించండి.",
+    ocrSaveNeedsPatient: "మీ పత్రాన్ని సేవ్ చేయడానికి ముందు మీ గుర్తింపును నిర్ధారించండి.",
+    ocrSaveHint: "మీ పత్రం సిద్ధంగా ఉంది. పై సమాచారాన్ని సమీక్షించి సేవ్ చేయండి.",
+    ocrOutOfRange: "సాధారణ పరిధికి వెలుపల గుర్తించబడింది",
   },
   kn: {
     ocrReaderTitle: "ವೈದ್ಯಕೀಯ ದಾಖಲೆ ವಾಚಕ",
@@ -1874,7 +1939,14 @@ const ocrReaderTranslations: Partial<Record<LanguageCode, Partial<TranslationTab
     ocrBackToDocs: "ದಾಖಲೆಗಳಿಗೆ ಹಿಂತಿರುಗಿ",
     ocrEntryTitle: "ನಿಮ್ಮ ಬಳಿ ಇರುವ ದಾಖಲೆಯನ್ನು ಓದಿ",
     ocrEntrySubtitle:
-      "ನಿಮ್ಮ ಸಾಧನದಿಂದ ಪ್ರಿಸ್ಕ್ರಿಪ್ಷನ್ ಅಥವಾ ವೈದ್ಯಕೀಯ ದಾಖಲೆಯ ಫೋಟೋವನ್ನು ಅಪ್‌ಲోడ್ ಮಾಡಿ.",
+      "ನಿಮ್ಮ ಸಾಧನದಿಂದ ಪ್ರಿಸ್ಕ್ರಿಪ್ಷನ್ ಅಥವಾ ವೈದ್ಯಕೀಯ ದಾಖಲೆಯ ಫೋಟೋವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.",
+    ocrSaveContinue: "ಉಳಿಸಿ ಮುಂದುವರಿಯಿರಿ",
+    ocrSaving: "ಉಳಿಸಲಾಗುತ್ತಿದೆ...",
+    ocrSaveSuccess: "ನಿಮ್ಮ ಆರೋಗ್ಯ ದಾಖಲೆಗಳಲ್ಲಿ ಉಳಿಸಲಾಗಿದೆ.",
+    ocrSaveFailed: "ದಾಖಲೆಯನ್ನು ಉಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    ocrSaveNeedsPatient: "ನಿಮ್ಮ ದಾಖಲೆಯನ್ನು ಉಳಿಸಲು ಮೊದಲು ನಿಮ್ಮ ಗುರುತನ್ನು ಖಚಿತಪಡಿಸಿಕೊಳ್ಳಿ.",
+    ocrSaveHint: "ನಿಮ್ಮ ದಾಖಲೆ ಸಿದ್ಧವಾಗಿದೆ. ಮೇಲಿನ ಮಾಹಿತಿಯನ್ನು ಪರಿಶೀಲಿಸಿ ಉಳಿಸಿ.",
+    ocrOutOfRange: "ಸಾಮಾನ್ಯ ವ್ಯಾಪ್ತಿಯ ಹೊರಗೆ ಗುರುತಿಸಲಾಗಿದೆ",
   },
   gu: {
     ocrReaderTitle: "મેડિકલ દસ્તાવેજ વાચક",
@@ -1949,6 +2021,13 @@ const ocrReaderTranslations: Partial<Record<LanguageCode, Partial<TranslationTab
     ocrBackToDocs: "દસ્તાવેજો પર પાછા",
     ocrEntryTitle: "તમારી પાસે હોય તેવો દસ્તાવેજ વાંચો",
     ocrEntrySubtitle: "તમારા ઉપકરણમાંથી પ્રિસ્ક્રિપશન અથવા તબીબી દસ્તાવેજનો ફોટો અપલોડ કરો.",
+    ocrSaveContinue: "સાચવો અને આગળ વધો",
+    ocrSaving: "સાચવી રહ્યા છીએ...",
+    ocrSaveSuccess: "તમારા સ્વાસ્થ્ય રેકોર્ડમાં સાચવવામાં આવ્યું.",
+    ocrSaveFailed: "દસ્તાવેજ સાચવી શકાયો નહીં. કૃપા કરીને ફરી પ્રયાસ કરો.",
+    ocrSaveNeedsPatient: "તમારો દસ્તાવેજ સાચવી શકાય તે માટે પહેલાં તમારી ઓળખની પુષ્ટિ કરો.",
+    ocrSaveHint: "તમારો દસ્તાવેજ તૈયાર છે. ઉપરની માહિતી જોઈને સાચવો.",
+    ocrOutOfRange: "સામાન્ય શ્રેણીની બહાર ચિહ્નિત",
   },
 };
 

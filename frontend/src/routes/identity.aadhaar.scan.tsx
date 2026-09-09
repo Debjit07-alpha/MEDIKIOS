@@ -14,7 +14,9 @@ function AadhaarScanPage() {
   const { t } = useLanguage();
   const { setPatient, clearIdentityMethod } = useKiosk();
 
-  const [status, setStatus] = useState<"ready" | "scanning" | "fetching" | "found" | "error">("ready");
+  const [status, setStatus] = useState<"ready" | "scanning" | "fetching" | "found" | "error">(
+    "ready",
+  );
   const [foundPatient, setFoundPatient] = useState<Patient | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const scanTimer = useRef<number | null>(null);
@@ -67,10 +69,7 @@ function AadhaarScanPage() {
   if (status === "found" && foundPatient) {
     return (
       <KioskShell step="identity">
-        <PageHeading
-          title={t("identityAadhaarTitle")}
-          subtitle={t("identityAadhaarSubtitle")}
-        />
+        <PageHeading title={t("identityAadhaarTitle")} subtitle={t("identityAadhaarSubtitle")} />
         <div className="mx-auto max-w-3xl rounded-4xl border-2 border-success bg-success-soft p-10 text-center shadow-card">
           <CheckCircle2 className="mx-auto size-20 text-success" />
           <div className="mt-4">

@@ -14,6 +14,18 @@ import {
 
 export type ConfidenceLevel = "high" | "medium" | "low";
 
+export type MedicalDocumentType =
+  | "prescription"
+  | "blood_test_report"
+  | "urine_test_report"
+  | "glucose_or_sugar_report"
+  | "lab_report"
+  | "medical_report"
+  | "procedure_report"
+  | "surgical_document"
+  | "other_medical_document"
+  | "unknown";
+
 export interface MedicineItem {
   name: string;
   strength: string | null;
@@ -31,6 +43,8 @@ export interface InvestigationItem {
   value: string | null;
   unit: string | null;
   referenceRange: string | null;
+  flag: string | null;
+  date: string | null;
   confidence: ConfidenceLevel;
   evidence: string;
 }
@@ -51,7 +65,7 @@ export interface DiagnosisItem {
 }
 
 export interface MedicalAnalysis {
-  documentType: "prescription" | "lab_report" | "medical_document" | "unknown";
+  documentType: MedicalDocumentType;
   patient: { name: string | null; age: string | null; sex: string | null };
   doctor: { name: string | null; registrationNumber: string | null };
   date: string | null;
@@ -69,7 +83,8 @@ export type GeminiErrorCode =
   | "REQUEST_FAILED"
   | "TIMEOUT"
   | "INVALID_JSON"
-  | "NO_OUTPUT";
+  | "NO_OUTPUT"
+  | "QUOTA_EXHAUSTED";
 
 export class GeminiAnalysisError extends Error {
   constructor(
@@ -81,10 +96,34 @@ export class GeminiAnalysisError extends Error {
   }
 }
 
-const ALLOWED_DOCUMENT_TYPES = [
+/**
+ * Detects Gemini quota / rate-limit exhaustion (HTTP 429,
+ * RESOURCE_EXHAUSTED, per-model daily free-tier quota messages).
+ * The raw provider message is NEVER forwarded to patients; callers map
+ * QUOTA_EXHAUSTED to a fixed patient-safe string and log only the code.
+ */
+export function isQuotaExhaustedError(error: unknown): boolean {
+  if (typeof error === "object" && error !== null) {
+    const record = error as Record<string, unknown>;
+    if (record.status === 429 || record.code === 429) return true;
+  }
+  const message =
+    error instanceof Error
+      ? error.message
+      : String((error as { message?: unknown } | null)?.message ?? "");
+  return /quota|RESOURCE_EXHAUSTED|GenerateRequestsPerDay|429/.test(message);
+}
+
+export const ALLOWED_DOCUMENT_TYPES = [
   "prescription",
+  "blood_test_report",
+  "urine_test_report",
+  "glucose_or_sugar_report",
   "lab_report",
-  "medical_document",
+  "medical_report",
+  "procedure_report",
+  "surgical_document",
+  "other_medical_document",
   "unknown",
 ] as const;
 
@@ -139,12 +178,23 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 
 const MEDICAL_PROMPT = `You are a careful medical document reader for a hospital kiosk.
 You are given TWO inputs for the SAME document:
-  1. The original prescription/document image.
+  1. The original medical document image (prescription, blood test, urine test,
+     sugar/glucose report, discharge paper, procedure/surgical record, etc.).
   2. Raw OCR text extracted by Tesseract.js from that image.
 
 Your job:
-- Inspect the ORIGINAL IMAGE carefully.
-- Compare it with the OCR text.
+- Inspect the ORIGINAL IMAGE carefully and compare it with the OCR text.
+- First CLASSIFY the document type into EXACTLY ONE of:
+    "prescription", "blood_test_report", "urine_test_report",
+    "glucose_or_sugar_report", "lab_report", "medical_report",
+    "procedure_report", "surgical_document", "other_medical_document", "unknown"
+  Choose "blood_test_report" for a blood panel/CBC/biochemistry result.
+  Choose "urine_test_report" for a urinalysis/urine culture report.
+  Choose "glucose_or_sugar_report" for a fasting/postprandial/random glucose,
+  HbA1c or GTT sugar report.
+  Choose "lab_report" for a laboratory report that does not fit the above
+  three (e.g. biochemistry, hormone, lipid, microbiology).
+  Prefer "prescription" when the document's main purpose is prescribing medicines.
 - Extract ONLY information that is visibly present in the document.
 - Correct obvious OCR errors ONLY when the image clearly supports the correction.
 - Preserve uncertainty. Never guess, never invent.
@@ -153,16 +203,26 @@ STRICT RULES (medical safety — follow every one):
 - NEVER invent a medicine, dosage, frequency, route, duration or instruction that is not visible.
 - If a medicine name is only partially legible, keep the legible fragment and mark confidence "low".
 - If a dosage/frequency is unclear, use null. Do NOT invent "500 mg", "1-0-1", "OD", "BD" etc.
-- NEVER invent a laboratory reference range. If the range is not in the document, use null.
+- NEVER invent a laboratory value, unit or reference range. If the range is not in the document, use null.
+- NEVER invent an abnormal flag. Set "flag" ONLY when the document marks the result as abnormal
+  (for example H, L, High, Low, Abnormal, Critical, "↑", "↓", or an asterisk used by the report).
+  Put the exact marker text as shown. Otherwise use null. Do NOT decide abnormality yourself.
+- Report every clearly visible investigation as its own item — there is NO fixed list of tests.
+  Extract whatever the report shows (test name, value, unit, reference range, flag, date).
+- Preserve the value, unit and reference range EXACTLY as printed, including decimals and brackets
+  (for example "5.6", "mmol/L", "70 - 100 mg/dL").
 - NEVER invent a diagnosis. Only return a diagnosis when the document explicitly states it
   (e.g. "DX: URTI", "Diagnosis: ...", "Imp: ..."). Otherwise return an empty diagnoses array.
-- If a medicine suggests a possible condition but the document does not state it, do NOT list it.
+- Never create a diagnosis from lab values, and never create one from the medicine list.
 - If the document type is unclear, use "unknown".
 - For patient/doctor/date fields that are not visible, use null.
+- The document may be in Hindi, Tamil, Bengali or another language. Keep medicine names, test names,
+  values and notes in the ORIGINAL language of the document. Do NOT translate them; do NOT guess.
+- If the same information appears in both English text and handwritten notes, prefer what is clearly readable.
 
 Return ONLY strict JSON (no markdown fences, no commentary) with EXACTLY this shape:
 {
-  "documentType": "prescription | lab_report | medical_document | unknown",
+  "documentType": "one of the ten types listed above",
   "patient": { "name": null, "age": null, "sex": null },
   "doctor": { "name": null, "registrationNumber": null },
   "date": null,
@@ -173,6 +233,7 @@ Return ONLY strict JSON (no markdown fences, no commentary) with EXACTLY this sh
   ],
   "investigations": [
     { "test": "", "value": null, "unit": null, "referenceRange": null,
+      "flag": null, "date": null,
       "confidence": "high | medium | low", "evidence": "" }
   ],
   "procedures": [
@@ -180,14 +241,14 @@ Return ONLY strict JSON (no markdown fences, no commentary) with EXACTLY this sh
       "confidence": "high | medium | low", "evidence": "" }
   ],
   "diagnoses": [
-    { "name": "", "status": "documented",
+    { "name": "", "status": "documented | inferred | uncertain",
       "confidence": "high | medium | low", "evidence": "" }
   ],
   "instructions": [],
   "warnings": []
 }
 Use null when information is not visible. Use [] when there are no items.
-Use empty arrays for empty groups. Never fill fields with made-up values.
+Use only "high", "medium" or "low" for confidence. Missing fields must be null, never invented.
 
 Raw Tesseract OCR text for reference:
 `;
@@ -265,6 +326,8 @@ function investigationArray(value: unknown): InvestigationItem[] {
         value: nullableString(item.value),
         unit: nullableString(item.unit),
         referenceRange: nullableString(item.referenceRange),
+        flag: nullableString(item.flag),
+        date: nullableString(item.date),
         confidence: confidence(item.confidence),
         evidence: string(item.evidence),
       };
@@ -406,6 +469,7 @@ export async function analyzeMedicalDocument(
 
   let result: Awaited<ReturnType<GenerativeModel["generateContent"]>> | null = null;
   let lastError: unknown = null;
+  let quotaExhausted: unknown = null;
 
   for (const modelName of candidateModelNames()) {
     try {
@@ -415,6 +479,15 @@ export async function analyzeMedicalDocument(
       if (error instanceof GeminiAnalysisError) throw error;
       if (error?.name === "AbortError" || error?.code === 408) {
         throw new GeminiAnalysisError("TIMEOUT", "Gemini analysis timed out.");
+      }
+      if (isQuotaExhaustedError(error)) {
+        // Quota is tracked per model per day: fall through to the next
+        // configured model exactly once each. The SAME model is never
+        // retried — a 429 means stop calling it. No loops, no backoff
+        // storms: at most one request per candidate model.
+        quotaExhausted = error;
+        lastError = error;
+        continue;
       }
       const modelIssue = /is not found|not supported for/i.test(
         (error?.message as string) || "",
@@ -431,6 +504,15 @@ export async function analyzeMedicalDocument(
   }
 
   if (!result) {
+    if (quotaExhausted) {
+      // Server log keeps the technical fact; the message itself carries
+      // no key, URL, or quota detail and is never shown to patients.
+      console.error("Gemini quota exhausted (QUOTA_EXHAUSTED): per-model daily request quota reached.");
+      throw new GeminiAnalysisError(
+        "QUOTA_EXHAUSTED",
+        "Gemini request quota is exhausted.",
+      );
+    }
     throw new GeminiAnalysisError(
       "REQUEST_FAILED",
       (lastError as Error | null)?.message || "No Gemini model could analyse the document.",

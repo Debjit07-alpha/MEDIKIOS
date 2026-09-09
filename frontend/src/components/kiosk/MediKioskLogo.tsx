@@ -32,15 +32,10 @@ export function MediKioskLogo({
     <span
       className={cn(
         "grid shrink-0 place-items-center rounded-full bg-white p-1.5 shadow-xs ring-1 ring-border/60",
-        badgeClassName ?? className
+        badgeClassName ?? className,
       )}
     >
-      <img
-        src="/medikiosk-logo.svg"
-        alt={alt}
-        className="size-full object-contain"
-        {...props}
-      />
+      <img src="/medikiosk-logo.svg" alt={alt} className="size-full object-contain" {...props} />
     </span>
   );
 }

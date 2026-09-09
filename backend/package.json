@@ -11,6 +11,7 @@
   "keywords": [],
   "type": "commonjs",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.124.0",
     "@google-cloud/speech": "^8.0.1",
     "@google-cloud/text-to-speech": "^7.0.0",
     "@google-cloud/vision": "^6.0.0",

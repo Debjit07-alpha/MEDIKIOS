@@ -5,12 +5,13 @@ import express, { Request, Response } from "express";
 import cors from "cors";
 import multer from "multer";
 import OpenAI from "openai";
+import { createHash } from "node:crypto";
 
 import voiceRouter from "./routes/voice";
-import ocrRouter from "./routes/ocr";
+import ocrRouter, { persistMedicalDocument } from "./routes/ocr";
 import { supabase } from "./database/supabase";
 import { ocrImage, ocrHttpResponse } from "./services/ocr";
-import { geminiConfigured } from "./services/geminiMedical";
+import { aiConfigured, aiModelName, aiProviderName } from "./services/aiMedical";
 import {
   DOCTOR_SUMMARY_QUESTION_ID,
   DOCTOR_SUMMARY_RESPONSE_TYPE,
@@ -544,77 +545,51 @@ app.post(
       }
 
       // ---------------------------------------------------
-      // D. Upload prescription image to Supabase Storage
+      // D. Archival (best-effort). OCR + analysis are finished, so archiving
+      //    must NEVER block returning the detected contents to the patient.
+      //    Storage uploads can fail (e.g. storage RLS) and the real
+      //    medical_documents schema differs from the assumed one, so any
+      //    failure is logged and the analysis is still returned.
       // ---------------------------------------------------
 
-      const fileName =
-        `${patientId || "anonymous"}/${Date.now()}.jpg`;
+      let documentId: string | null = null;
+      let imageUrl: string | null = null;
 
-      const { error: storageError } = await supabase.storage
-        .from("prescriptions")
-        .upload(fileName, file.buffer, {
-          contentType: file.mimetype,
-          upsert: false,
+      try {
+        const digest = createHash("sha256").update(file.buffer).digest("hex");
+        const archivalName = `documents/${patientId || "anonymous"}/${Date.now()}-${digest}.jpg`;
+
+        const persisted = await persistMedicalDocument({
+          file,
+          patientId: patientId || "",
+          documentType: "prescription",
+          rawOcrText: fullText,
+          storagePath: archivalName,
         });
 
-      if (storageError) {
+        documentId = persisted.documentId;
+        imageUrl = persisted.imageUrl;
+      } catch (archiveError) {
         console.error(
-          "Prescription storage upload error:",
-          storageError
+          "Prescription archival skipped (analysis is still returned):",
+          archiveError,
         );
-
-        return res.status(500).json({
-          success: false,
-          error: storageError.message,
-        });
       }
 
       // ---------------------------------------------------
-      // E. Save document record in Supabase
+      // E. Return result — always, even when archival failed.
       // ---------------------------------------------------
-
-      const { data: docRecord, error: documentError } =
-        await supabase
-          .from("medical_documents")
-          .insert([
-            {
-              patient_id: patientId || null,
-              file_path: fileName,
-              raw_ocr_text: fullText,
-              structured_data: structuredData,
-            },
-          ])
-          .select()
-          .single();
-
-      if (documentError) {
-        console.error(
-          "Medical document database error:",
-          documentError
-        );
-
-        return res.status(500).json({
-          success: false,
-          error: documentError.message,
-        });
-      }
-
-      // ---------------------------------------------------
-      // F. Return result
-      // ---------------------------------------------------
-
-      const supabaseUrl = process.env.SUPABASE_URL;
-
-      const imageUrl = supabaseUrl
-        ? `${supabaseUrl}/storage/v1/object/public/prescriptions/${fileName}`
-        : null;
 
       return res.json({
         success: true,
-        documentId: docRecord.id,
+        documentId,
         imageUrl,
         analysis: structuredData,
         rawOcrText: fullText,
+        warning:
+          documentId === null
+            ? "The document was read, but it could not be stored in the health record right now."
+            : null,
       });
     } catch (error: any) {
       console.error(
@@ -624,9 +599,7 @@ app.post(
 
       return res.status(500).json({
         success: false,
-        error:
-          error.message ||
-          "Server failed to process document",
+        error: "The document could not be processed right now. Please try again.",
       });
     }
   }
@@ -649,7 +622,7 @@ app.listen(PORT, () => {
   );
 
   console.log(
-    `Gemini: ${geminiConfigured() ? "configured" : "not configured (set GEMINI_API_KEY)"}`
+    `Medical AI: ${aiConfigured() ? `configured (${aiProviderName()}, model ${aiModelName()})` : "not configured (set ANTHROPIC_API_KEY)"}`
   );
 
   console.log(

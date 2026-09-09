@@ -99,6 +99,18 @@ export interface OcrResult {
 
 export type OcrConfidence = "high" | "medium" | "low";
 
+export type OcrDocumentType =
+  | "prescription"
+  | "blood_test_report"
+  | "urine_test_report"
+  | "glucose_or_sugar_report"
+  | "lab_report"
+  | "medical_report"
+  | "procedure_report"
+  | "surgical_document"
+  | "other_medical_document"
+  | "unknown";
+
 export interface OcrMedicine {
   name: string;
   strength: string | null;
@@ -116,6 +128,8 @@ export interface OcrInvestigation {
   value: string | null;
   unit: string | null;
   referenceRange: string | null;
+  flag: string | null;
+  date: string | null;
   confidence: OcrConfidence;
   evidence: string;
 }
@@ -136,7 +150,7 @@ export interface OcrDiagnosis {
 }
 
 export interface OcrDocumentAnalysis {
-  documentType: "prescription" | "lab_report" | "medical_document" | "unknown";
+  documentType: OcrDocumentType;
   patient: { name: string | null; age: string | null; sex: string | null };
   doctor: { name: string | null; registrationNumber: string | null };
   date: string | null;
@@ -157,6 +171,8 @@ export interface OcrPreprocessing {
   format?: string;
 }
 
+export type OcrAnalysisStatus = "ready" | "temporarily_unavailable" | "unavailable";
+
 export interface OcrAnalyzeResponse {
   success: boolean;
   ocr: {
@@ -166,10 +182,19 @@ export interface OcrAnalyzeResponse {
     preprocessing: OcrPreprocessing;
   };
   analysis: OcrDocumentAnalysis | null;
+  analysisStatus: OcrAnalysisStatus;
   warnings: string[];
   warning: string | null;
   documentId?: string | null;
   imageUrl?: string | null;
+}
+
+export interface OcrSaveResponse {
+  success: boolean;
+  documentId: string;
+  imageUrl?: string | null;
+  alreadySaved?: boolean;
+  warning?: string | null;
 }
 
 export interface TimelineItem {
@@ -342,6 +367,35 @@ export const api = {
       const formData = new FormData();
       formData.append("file", file);
       return upload<OcrAnalyzeResponse>("/api/ocr/analyze", formData);
+    },
+
+    retryAnalysis: async (file: File, ocrText: string) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("ocrText", ocrText);
+      return upload<OcrAnalyzeResponse>("/api/ocr/retry-analysis", formData);
+    },
+
+    saveDocument: async (input: {
+      patientId: string;
+      file: File;
+      saveKey: string;
+      documentType: OcrDocumentType;
+      rawOcrText: string;
+      analysis: OcrDocumentAnalysis | null;
+      analysisStatus: OcrAnalysisStatus;
+      warnings: string[];
+    }) => {
+      const formData = new FormData();
+      formData.append("file", input.file);
+      formData.append("patientId", input.patientId);
+      formData.append("saveKey", input.saveKey);
+      formData.append("documentType", input.documentType);
+      formData.append("rawOcrText", input.rawOcrText);
+      formData.append("analysis", JSON.stringify(input.analysis));
+      formData.append("analysisStatus", input.analysisStatus);
+      formData.append("warnings", JSON.stringify(input.warnings));
+      return upload<OcrSaveResponse>("/api/ocr/save", formData);
     },
   },
 

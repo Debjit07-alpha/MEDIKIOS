@@ -25,17 +25,11 @@ type DoctorSummaryData = {
   generatedBy?: string;
 };
 
-export function DoctorSummaryView({
-  summary,
-}: {
-  summary: DoctorSummaryData;
-}) {
+export function DoctorSummaryView({ summary }: { summary: DoctorSummaryData }) {
   if (!summary?.sections?.length) {
     return (
       <div className="rounded-3xl border border-border bg-card p-6 text-center shadow-card">
-        <p className="text-lg text-muted-foreground">
-          No doctor summary available.
-        </p>
+        <p className="text-lg text-muted-foreground">No doctor summary available.</p>
       </div>
     );
   }
@@ -61,33 +55,25 @@ export function DoctorSummaryView({
               <dt className="min-w-[120px] text-sm font-bold uppercase tracking-wider text-muted-foreground">
                 Name
               </dt>
-              <dd className="text-lg font-semibold">
-                {summary.patient.name || "Not provided"}
-              </dd>
+              <dd className="text-lg font-semibold">{summary.patient.name || "Not provided"}</dd>
             </div>
             <div className="flex gap-3">
               <dt className="min-w-[120px] text-sm font-bold uppercase tracking-wider text-muted-foreground">
                 Age
               </dt>
-              <dd className="text-lg font-semibold">
-                {summary.patient.age ?? "Not provided"}
-              </dd>
+              <dd className="text-lg font-semibold">{summary.patient.age ?? "Not provided"}</dd>
             </div>
             <div className="flex gap-3">
               <dt className="min-w-[120px] text-sm font-bold uppercase tracking-wider text-muted-foreground">
                 Sex
               </dt>
-              <dd className="text-lg font-semibold">
-                {summary.patient.sex || "Not provided"}
-              </dd>
+              <dd className="text-lg font-semibold">{summary.patient.sex || "Not provided"}</dd>
             </div>
             <div className="flex gap-3">
               <dt className="min-w-[120px] text-sm font-bold uppercase tracking-wider text-muted-foreground">
                 UHID
               </dt>
-              <dd className="text-lg font-semibold">
-                {summary.patient.uhid || "Not provided"}
-              </dd>
+              <dd className="text-lg font-semibold">{summary.patient.uhid || "Not provided"}</dd>
             </div>
           </dl>
         </div>
@@ -110,9 +96,7 @@ export function DoctorSummaryView({
                   <dt className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
                     {item.label}
                   </dt>
-                  <dd className="mt-1 text-lg font-semibold whitespace-pre-wrap">
-                    {item.value}
-                  </dd>
+                  <dd className="mt-1 text-lg font-semibold whitespace-pre-wrap">{item.value}</dd>
                 </div>
               ))}
             </dl>

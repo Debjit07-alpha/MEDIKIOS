@@ -80,9 +80,7 @@ function AbhaInputPage() {
         <div className="mx-auto max-w-3xl rounded-4xl border-2 border-border bg-card p-12 text-center shadow-card">
           <Loader2 className="mx-auto size-20 animate-spin text-primary" />
           <h2 className="mt-6 text-4xl font-extrabold">{t("identityFetching")}</h2>
-          <p className="mt-3 text-xl text-muted-foreground">
-            Verifying ABHA: {abhaNumber}
-          </p>
+          <p className="mt-3 text-xl text-muted-foreground">Verifying ABHA: {abhaNumber}</p>
         </div>
       </KioskShell>
     );
@@ -102,9 +100,7 @@ function AbhaInputPage() {
           <p className="mt-1 text-xl text-muted-foreground">
             {foundPatient.age} yrs · {foundPatient.sex} · UHID: {foundPatient.uhid}
           </p>
-          <p className="mt-2 text-base font-semibold text-primary">
-            ABHA: {abhaNumber}
-          </p>
+          <p className="mt-2 text-base font-semibold text-primary">ABHA: {abhaNumber}</p>
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <button
               type="button"

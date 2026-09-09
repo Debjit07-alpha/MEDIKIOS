@@ -10,10 +10,7 @@ import { translate } from "@/lib/i18n";
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error("Doctor summary request timed out")),
-      ms,
-    );
+    const timer = setTimeout(() => reject(new Error("Doctor summary request timed out")), ms);
     promise.then(
       (value) => {
         clearTimeout(timer);
@@ -117,9 +114,7 @@ function SharePage() {
         <div className="mt-6 flex flex-col items-center gap-4 rounded-4xl border-2 border-primary bg-primary-soft p-10 shadow-card">
           <Loader2 className="size-12 animate-spin text-primary" />
           <p className="text-xl font-bold text-primary">
-            {language === "en"
-              ? "Generating doctor summary..."
-              : t("generatingSummary")}
+            {language === "en" ? "Generating doctor summary..." : t("generatingSummary")}
           </p>
           <p className="text-muted-foreground">
             {language === "en"

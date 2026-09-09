@@ -79,7 +79,9 @@ function NewPatientFormPage() {
       const patientRecord: Patient = {
         name: created.name || form.name.trim(),
         age: created.age || Number(form.age),
-        sex: created.gender || (form.gender === "male" ? "Male" : form.gender === "female" ? "Female" : "Other"),
+        sex:
+          created.gender ||
+          (form.gender === "male" ? "Male" : form.gender === "female" ? "Female" : "Other"),
         uhid: created.id || `DGH/2026/${Math.floor(1000 + Math.random() * 9000)}`,
         route: "new",
       };
@@ -98,10 +100,7 @@ function NewPatientFormPage() {
   if (status === "creating") {
     return (
       <KioskShell step="identity">
-        <PageHeading
-          title={t("identityNewTitle")}
-          subtitle={t("identityNewSubtitle")}
-        />
+        <PageHeading title={t("identityNewTitle")} subtitle={t("identityNewSubtitle")} />
         <div className="mx-auto max-w-3xl rounded-4xl border-2 border-border bg-card p-12 text-center shadow-card">
           <Loader2 className="mx-auto size-20 animate-spin text-primary" />
           <h2 className="mt-6 text-4xl font-extrabold">Creating your new patient record...</h2>
@@ -116,10 +115,7 @@ function NewPatientFormPage() {
   if (status === "confirmed" && createdPatient) {
     return (
       <KioskShell step="identity">
-        <PageHeading
-          title={t("identityNewTitle")}
-          subtitle={t("identityNewSubtitle")}
-        />
+        <PageHeading title={t("identityNewTitle")} subtitle={t("identityNewSubtitle")} />
         <div className="mx-auto max-w-3xl rounded-4xl border-2 border-success bg-success-soft p-10 text-center shadow-card">
           <CheckCircle2 className="mx-auto size-20 text-success" />
           <h2 className="mt-6 text-5xl font-extrabold">{t("identityNewCreated")}</h2>
@@ -192,7 +188,9 @@ function NewPatientFormPage() {
               onChange={(e) => update("name", e.target.value)}
               placeholder={t("identityNamePlaceholder")}
               className={`min-h-16 rounded-2xl border-2 bg-background p-4 text-xl ${
-                submittedAttempt && !isNameValid ? "border-destructive ring-1 ring-destructive" : "border-border"
+                submittedAttempt && !isNameValid
+                  ? "border-destructive ring-1 ring-destructive"
+                  : "border-border"
               }`}
             />
             {submittedAttempt && !isNameValid ? (
@@ -215,7 +213,9 @@ function NewPatientFormPage() {
                 onChange={(e) => update("age", e.target.value.replace(/\D/g, "").slice(0, 3))}
                 placeholder={t("identityAgePlaceholder")}
                 className={`min-h-16 rounded-2xl border-2 bg-background p-4 text-xl ${
-                  submittedAttempt && !isAgeValid ? "border-destructive ring-1 ring-destructive" : "border-border"
+                  submittedAttempt && !isAgeValid
+                    ? "border-destructive ring-1 ring-destructive"
+                    : "border-border"
                 }`}
               />
               {submittedAttempt && !isAgeValid ? (
@@ -282,7 +282,9 @@ function NewPatientFormPage() {
               onChange={(e) => update("mobile", e.target.value.replace(/\D/g, "").slice(0, 10))}
               placeholder={t("identityMobilePlaceholder")}
               className={`min-h-16 rounded-2xl border-2 bg-background p-4 text-xl ${
-                submittedAttempt && !isMobileValid ? "border-destructive ring-1 ring-destructive" : "border-border"
+                submittedAttempt && !isMobileValid
+                  ? "border-destructive ring-1 ring-destructive"
+                  : "border-border"
               }`}
             />
             <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
@@ -307,7 +309,9 @@ function NewPatientFormPage() {
               placeholder={t("identityAddressPlaceholder")}
               rows={3}
               className={`rounded-2xl border-2 bg-background p-4 text-xl ${
-                submittedAttempt && !isAddressValid ? "border-destructive ring-1 ring-destructive" : "border-border"
+                submittedAttempt && !isAddressValid
+                  ? "border-destructive ring-1 ring-destructive"
+                  : "border-border"
               }`}
             />
             {submittedAttempt && !isAddressValid ? (
