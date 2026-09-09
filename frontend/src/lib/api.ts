@@ -89,6 +89,14 @@ export interface InterviewResponseInput {
   responseType: string;
 }
 
+export interface OcrResult {
+  success: boolean;
+  text: string;
+  pages: number;
+  provider: string;
+  source: string;
+}
+
 export interface TimelineItem {
   id: string;
   date: string;
@@ -218,10 +226,14 @@ export const api = {
   },
 
   documents: {
-    analyze: async (patientId: string, file: File) => {
+    analyze: async (patientId: string, file: File, ocrText?: string) => {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("patientId", patientId);
+      const text = ocrText?.trim();
+      if (text) {
+        formData.append("ocrText", text);
+      }
       return upload<PrescriptionAnalysis>("/api/documents/prescription/analyze", formData);
     },
 
@@ -232,6 +244,14 @@ export const api = {
       }),
 
     list: (patientId: string) => request<DocumentRecord[]>(`/api/documents/${patientId}`),
+  },
+
+  ocr: {
+    extract: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      return upload<OcrResult>("/api/ocr", formData);
+    },
   },
 
   timeline: {

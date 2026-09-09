@@ -7,15 +7,17 @@ import {
   ArrowRight,
   ArrowLeft,
   Loader2,
-  AlertTriangle,
   ScanLine,
+  RotateCcw,
+  Trash2,
 } from "lucide-react";
 import { KioskShell, PageHeading } from "@/components/kiosk/KioskShell";
 import { ListenButton } from "@/components/kiosk/ListenButton";
 import { DocumentCard } from "@/components/kiosk/DocumentCard";
 import type { DocKind, ExtractedDoc } from "@/lib/kiosk-data";
 import { useKiosk, useLanguage } from "@/lib/kiosk-hooks";
-import { api } from "@/lib/api";
+import { api, type Medicine } from "@/lib/api";
+import type { TranslationKey } from "@/lib/i18n";
 
 export const Route = createFileRoute("/papers")({
   component: PapersPage,
@@ -44,6 +46,34 @@ const KINDS: { kind: DocKind; icon: typeof FileHeart; title: string; sub: string
 
 const STAGES = ["Capturing the paper...", "Reading text with AI...", "Storing your record..."];
 
+const ALLOWED_FILE_TYPES = /^image\/(jpeg|png|gif|bmp|x-ms-bmp|tiff|tif)$/;
+
+type AnalyzedMedicine = Medicine & { writtenName?: string; purpose?: string };
+
+type OcrErrorCode =
+  | "NO_TEXT"
+  | "INVALID_FILE"
+  | "FILE_TOO_LARGE"
+  | "RATE_LIMITED"
+  | "OCR_API_KEY_MISSING"
+  | "OCR_API_KEY_INVALID"
+  | "OCR_TIMEOUT"
+  | "OCR_SERVICE_UNAVAILABLE";
+
+function ocrErrorMessage(t: (key: TranslationKey) => string, code?: string): string {
+  switch (code as OcrErrorCode | undefined) {
+    case "NO_TEXT":
+    case "INVALID_FILE":
+      return t("ocrNoText");
+    case "FILE_TOO_LARGE":
+      return t("ocrTooLarge");
+    case "RATE_LIMITED":
+      return t("ocrRateLimited");
+    default:
+      return t("ocrUnavailable");
+  }
+}
+
 function PapersPage() {
   const { addDocument, documents, patient } = useKiosk();
   const { t } = useLanguage();
@@ -53,6 +83,9 @@ function PapersPage() {
   const [stage, setStage] = useState<number | null>(null);
   const [latest, setLatest] = useState<ExtractedDoc | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState(false);
+  const [extractedText, setExtractedText] = useState("");
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeKind, setActiveKind] = useState<DocKind | null>(null);
@@ -63,54 +96,102 @@ function PapersPage() {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !patient || !activeKind) return;
+  const runExtract = async (file: File) => {
+    setLatest(null);
+    setReviewing(false);
+    setError(null);
+    setStage(0);
+
+    const stageInterval = setInterval(() => {
+      setStage((prev) => (prev !== null && prev < 1 ? prev + 1 : prev));
+    }, 1500);
 
     try {
-      setLatest(null);
-      setStage(0);
-
-      const stageInterval = setInterval(() => {
-        setStage((prev) => (prev !== null && prev < 2 ? prev + 1 : prev));
-      }, 1500);
-
-      const response = await api.documents.analyze(patient.uhid, file);
-
+      const result = await api.ocr.extract(file);
+      setExtractedText(result.text);
+      setReviewing(true);
+    } catch (err) {
+      const code = (err as { code?: string })?.code;
+      console.error(err);
+      setError(ocrErrorMessage(t, code));
+    } finally {
       clearInterval(stageInterval);
       setStage(null);
+    }
+  };
 
-      if (response && response.success) {
-        const selectedKind = KINDS.find((k) => k.kind === activeKind);
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (event.target) event.target.value = "";
+    if (!file || !patient || !activeKind) return;
 
-        // --- FIXING OBJECT LITERAL ERRORS HERE ---
-        const newDoc: ExtractedDoc = {
-          id: response.documentId,
-          kind: activeKind,
-          kindLabel: selectedKind?.title || "Document",
-          title: selectedKind?.title || "Medical Scan",
-          facility: "Kiosk Scan",
-          date: new Date().toLocaleDateString(),
-          // Use 'diagnoses' array instead of 'diagnosis' string
-          diagnoses: [response.analysis.summary || "Extracted from scan"],
-          // Rename 'medicines' to 'medications' and map keys to: name, dose, schedule, duration
-          medications: response.analysis.medicines.map((m) => ({
-            name: m.writtenName,
-            dose: m.strength || m.dosage || "",
-            schedule: `${m.frequency || ""} ${m.purpose ? `(${m.purpose})` : ""}`,
-            duration: "As prescribed",
-          })),
-        };
+    if (!ALLOWED_FILE_TYPES.test(file.type) && file.type !== "application/pdf") {
+      setError(t("ocrNoText"));
+      return;
+    }
 
-        addDocument(activeKind);
-        setLatest(newDoc);
-      }
+    setPendingFile(file);
+    await runExtract(file);
+  };
+
+  const handleRetry = () => {
+    if (pendingFile) void runExtract(pendingFile);
+  };
+
+  const handleClear = () => {
+    setPendingFile(null);
+    setExtractedText("");
+    setReviewing(false);
+    setLatest(null);
+    setError(null);
+    setStage(null);
+  };
+
+  const handleStore = async () => {
+    if (!pendingFile || !patient || !activeKind) return;
+
+    setReviewing(false);
+    setStage(2);
+    setError(null);
+
+    try {
+      const response = await api.documents.analyze(patient.uhid || "", pendingFile, extractedText);
+
+      if (!response) throw new Error("Empty response");
+
+      const selectedKind = KINDS.find((k) => k.kind === activeKind);
+      const analysis = response.analysis as typeof response.analysis & {
+        summary?: string;
+      };
+
+      const newDoc: ExtractedDoc = {
+        id: response.documentId,
+        kind: activeKind,
+        kindLabel: selectedKind?.title || "Document",
+        title: selectedKind?.title || "Medical Scan",
+        facility: "Kiosk Scan",
+        date: new Date().toLocaleDateString(),
+        diagnoses: [analysis.summary || "Extracted from scan"],
+        medications: response.analysis.medicines.map((m) => {
+          const med = m as AnalyzedMedicine;
+          return {
+            name: med.writtenName || med.medicineName || med.genericName || "Unknown",
+            dose: med.strength || med.dosage || "",
+            schedule: [med.frequency, med.purpose].filter(Boolean).join(" ").trim(),
+            duration: med.duration || "As prescribed",
+          };
+        }),
+      };
+
+      addDocument(activeKind);
+      setLatest(newDoc);
     } catch (err) {
-      setStage(null);
-      setError(t("documentError"));
       console.error(err);
+      setStage(null);
+      setError(ocrErrorMessage(t, (err as { code?: string })?.code));
+      setReviewing(true);
     } finally {
-      if (event.target) event.target.value = "";
+      setStage(null);
     }
   };
 
@@ -118,7 +199,7 @@ function PapersPage() {
     <KioskShell step="papers">
       <input
         type="file"
-        accept="image/*"
+        accept="image/*,application/pdf"
         capture="environment"
         className="hidden"
         ref={fileInputRef}
@@ -147,13 +228,64 @@ function PapersPage() {
             />
           </div>
         </div>
+      ) : reviewing ? (
+        <div className="animate-rise">
+          <div className="rounded-4xl border-2 border-border bg-card p-6 shadow-card sm:p-8">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
+              <div className="min-w-0">
+                <h2 className="text-3xl leading-tight">{t("ocrReviewTitle")}</h2>
+                <p className="mt-2 text-lg text-muted-foreground">{t("ocrReviewSubtitle")}</p>
+              </div>
+              <ListenButton
+                text={`${t("ocrReviewSubtitle")} ${extractedText}`}
+                label={t("listen")}
+              />
+            </div>
+
+            <label className="mt-6 block text-sm font-bold uppercase tracking-widest text-muted-foreground">
+              {t("ocrTextLabel")}
+            </label>
+            <textarea
+              value={extractedText}
+              onChange={(event) => setExtractedText(event.target.value)}
+              rows={12}
+              className="mt-2 w-full resize-y rounded-2xl border-2 border-border bg-background p-4 text-lg font-medium leading-relaxed outline-none focus:border-primary"
+            />
+
+            <div className="mt-8 flex flex-wrap items-center justify-between gap-4">
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="inline-flex min-h-14 items-center gap-2 rounded-full border-2 border-border bg-card px-6 text-lg font-bold"
+                >
+                  <Trash2 className="size-5" /> {t("clearDocument")}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRetry}
+                  className="inline-flex min-h-14 items-center gap-2 rounded-full border-2 border-border bg-card px-6 text-lg font-bold"
+                >
+                  <RotateCcw className="size-5" /> {t("retryOcr")}
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={handleStore}
+                className="inline-flex min-h-20 items-center gap-3 rounded-full bg-primary px-10 text-2xl font-extrabold text-primary-foreground shadow-lift"
+              >
+                {t("looksCorrect")} <ArrowRight className="size-7" />
+              </button>
+            </div>
+          </div>
+        </div>
       ) : latest ? (
         <div className="animate-rise">
           <DocumentCard doc={latest} />
           <div className="mt-8 flex flex-wrap items-center justify-between gap-4">
             <button
               type="button"
-              onClick={() => setLatest(null)}
+              onClick={handleClear}
               className="inline-flex min-h-16 items-center gap-2 rounded-full border-2 border-border bg-card px-8 text-xl font-bold"
             >
               <ArrowLeft className="size-6" /> {t("scanAnother")}

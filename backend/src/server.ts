@@ -4,12 +4,12 @@ dotenv.config();
 import express, { Request, Response } from "express";
 import cors from "cors";
 import multer from "multer";
-import vision from "@google-cloud/vision";
 import OpenAI from "openai";
 
 import voiceRouter from "./routes/voice";
+import ocrRouter from "./routes/ocr";
 import { supabase } from "./database/supabase";
-import { assertGoogleCredentials } from "./services/googleCredentials";
+import { assertOcrApiKey, ocrImage, ocrHttpResponse } from "./services/ocr";
 
 const app = express();
 
@@ -25,14 +25,11 @@ app.use(cors());
 app.use(express.json());
 
 app.use("/api/voice", voiceRouter);
+app.use("/api/ocr", ocrRouter);
 
 // ---------------------------------------------------------
 // External Clients
 // ---------------------------------------------------------
-
-// Google Vision client.
-// Credentials are checked only when OCR is actually requested.
-const visionClient = new vision.ImageAnnotatorClient();
 
 // OpenAI is OPTIONAL.
 // The server can start even when OPENAI_API_KEY is not configured.
@@ -291,12 +288,13 @@ app.post(
   async (req: any, res: Response) => {
     try {
       const file = req.file;
-      const { patientId } = req.body;
+      const { patientId, ocrText } = req.body;
 
       if (!file) {
         return res.status(400).json({
           success: false,
           error: "No image provided",
+          code: "INVALID_FILE",
         });
       }
 
@@ -304,42 +302,37 @@ app.post(
       let structuredData: any = null;
 
       // ---------------------------------------------------
-      // A. Google Vision OCR
+      // A. Text extraction (OCR.Space)
       // ---------------------------------------------------
 
-      try {
-        assertGoogleCredentials();
+      // When the kiosk has already extracted and reviewed the text,
+      // the corrected version is passed back so it is NOT re-OCRed.
+      const reviewedText =
+        typeof ocrText === "string" ? ocrText.trim() : "";
 
-        const [result] =
-          await visionClient.documentTextDetection(file.buffer);
+      if (reviewedText) {
+        fullText = reviewedText;
+      } else {
+        try {
+          const ocrResult = await ocrImage(
+            file.buffer,
+            file.mimetype,
+            { fileName: file.originalname },
+          );
 
-        fullText =
-          result.fullTextAnnotation?.text?.trim() || "";
-
-        if (!fullText) {
-          throw new Error("OCR returned no text");
+          fullText = ocrResult.text;
+          console.log("OCR completed successfully.");
+        } catch (ocrError) {
+          const mapped = ocrHttpResponse(ocrError);
+          return res.status(mapped.status).json(mapped.body);
         }
-
-        console.log("Google OCR completed successfully.");
-      } catch (ocrError: any) {
-        console.warn(
-          "Google Vision OCR failed:",
-          ocrError?.message || ocrError
-        );
-
-        // Demo fallback for development/testing.
-        fullText = "Demo OCR Text";
-
-        console.warn(
-          "Using demo OCR text because Google Vision is unavailable."
-        );
       }
 
       // ---------------------------------------------------
       // B. Optional OpenAI Analysis
       // ---------------------------------------------------
 
-      if (openai && fullText !== "Demo OCR Text") {
+      if (openai) {
         try {
           const aiResponse =
             await openai.chat.completions.create({
@@ -373,20 +366,18 @@ app.post(
         }
       } else {
         console.warn(
-          "OpenAI API key not configured or OCR is demo data."
+          "OpenAI API key not configured."
         );
       }
 
       // ---------------------------------------------------
-      // C. Demo structured data if AI unavailable
+      // C. Structured data fallback if AI unavailable
       // ---------------------------------------------------
 
       if (!structuredData) {
         structuredData = {
           summary:
-            fullText === "Demo OCR Text"
-              ? "Demo prescription analysis"
-              : "Prescription text extracted. AI analysis unavailable.",
+            "Prescription text extracted. AI analysis unavailable.",
           medicines: [],
         };
       }
@@ -495,4 +486,17 @@ app.listen(PORT, () => {
     `OpenAI: ${openai ? "configured" : "not configured"
     }`
   );
+
+  console.log(
+    `OCR: ${assertOcrApiKeySafe() ? "configured (OCR.Space)" : "not configured (set OCR_API_KEY)"}`
+  );
 });
+
+function assertOcrApiKeySafe(): boolean {
+  try {
+    assertOcrApiKey();
+    return true;
+  } catch {
+    return false;
+  }
+}
