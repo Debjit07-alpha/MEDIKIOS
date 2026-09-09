@@ -1,8 +1,18 @@
+// Language data lives in ./languages (single source of truth). These legacy
+// exports keep the rest of the app compiling against the same single config.
+import {
+  getLanguageConfig,
+  getSpeechLocale as getSpeechLocaleFromConfig,
+  isLanguageCode,
+  SUPPORTED_LANGUAGES,
+  type LanguageCode,
+  type SpeechLocale,
+} from "./languages";
+
 export type CareMode = "allopathy" | "ayush";
 
-export type LanguageCode = "hi" | "en" | "mr" | "bn" | "ta" | "te" | "kn" | "gu";
-export type SpeechLocale =
-  "hi-IN" | "en-IN" | "mr-IN" | "bn-IN" | "ta-IN" | "te-IN" | "kn-IN" | "gu-IN";
+export type { LanguageCode, SpeechLocale } from "./languages";
+export { isLanguageCode } from "./languages";
 
 export type Language = {
   code: LanguageCode;
@@ -11,35 +21,29 @@ export type Language = {
   speech: SpeechLocale;
 };
 
-export const DEFAULT_LANGUAGE: Language = {
-  code: "en",
-  native: "English",
-  english: "English",
-  speech: "en-IN",
-};
-
-export const LANGUAGES: Language[] = [
-  { code: "hi", native: "हिन्दी", english: "Hindi", speech: "hi-IN" },
-  DEFAULT_LANGUAGE,
-  { code: "mr", native: "मराठी", english: "Marathi", speech: "mr-IN" },
-  { code: "bn", native: "বাংলা", english: "Bengali", speech: "bn-IN" },
-  { code: "ta", native: "தமிழ்", english: "Tamil", speech: "ta-IN" },
-  { code: "te", native: "తెలుగు", english: "Telugu", speech: "te-IN" },
-  { code: "kn", native: "ಕನ್ನಡ", english: "Kannada", speech: "kn-IN" },
-  { code: "gu", native: "ગુજરાતી", english: "Gujarati", speech: "gu-IN" },
-];
-
-export function isLanguageCode(value: unknown): value is LanguageCode {
-  return typeof value === "string" && LANGUAGES.some((language) => language.code === value);
+function toLegacyLanguage(code: LanguageCode): Language {
+  const config = getLanguageConfig(code);
+  return {
+    code: config.code,
+    native: config.nativeName,
+    english: config.name,
+    speech: config.locale,
+  };
 }
 
+export const DEFAULT_LANGUAGE: Language = toLegacyLanguage("en");
+
+export const LANGUAGES: Language[] = SUPPORTED_LANGUAGES.map((language) =>
+  toLegacyLanguage(language.code),
+);
+
 export function getLanguage(code: LanguageCode) {
-  return LANGUAGES.find((language) => language.code === code) ?? DEFAULT_LANGUAGE;
+  return toLegacyLanguage(code);
 }
 
 /** Single source of truth: every voice subsystem must derive its locale here. */
 export function getSpeechLocaleFromLanguage(code: LanguageCode): SpeechLocale {
-  return getLanguage(code).speech;
+  return getSpeechLocaleFromConfig(code);
 }
 
 export const STEPS = [

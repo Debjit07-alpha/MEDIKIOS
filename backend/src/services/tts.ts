@@ -16,9 +16,42 @@ const VOICES: Record<string, string> = {
   "te-IN": "te-IN-Wavenet-A",
   "kn-IN": "kn-IN-Wavenet-A",
   "gu-IN": "gu-IN-Wavenet-A",
+  "ml-IN": "ml-IN-Wavenet-A",
+  "pa-IN": "pa-IN-Wavenet-A",
+  "ur-IN": "ur-IN-Wavenet-A",
+  "ne-IN": "ne-IN-Wavenet-A",
+  "or-IN": "or-IN-Wavenet-A",
 };
 
 const GOOGLE_CLOUD_TTS_LANGUAGES = new Set(Object.keys(VOICES));
+
+/**
+ * Locales the Translate TTS fallback can genuinely speak (verified against the
+ * endpoint). Languages not listed here MUST NOT be silently redirected to
+ * English: if Google Cloud credentials are unavailable they return a controlled
+ * error instead, and the kiosk falls back to browser speech or quiet mode.
+ */
+const TRANSLATE_TTS_LANGUAGES: Record<string, string> = {
+  "en-IN": "en",
+  "hi-IN": "hi",
+  "bn-IN": "bn",
+  "mr-IN": "mr",
+  "ta-IN": "ta",
+  "te-IN": "te",
+  "kn-IN": "kn",
+  "gu-IN": "gu",
+  "ml-IN": "ml",
+  "pa-IN": "pa",
+  "ur-IN": "ur",
+  "ne-IN": "ne",
+};
+
+export function isTtsLanguageCode(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    (GOOGLE_CLOUD_TTS_LANGUAGES.has(value) || value in TRANSLATE_TTS_LANGUAGES)
+  );
+}
 
 /**
  * Google Translate's free TTS endpoint (no API key required). Used as a
@@ -92,17 +125,11 @@ function trimToSentence(text: string, maxLength: number): string {
 }
 
 function translateTtsLang(languageCode: string): string {
-  const lookup: Record<string, string> = {
-    "en-IN": "en",
-    "hi-IN": "hi",
-    "bn-IN": "bn",
-    "mr-IN": "mr",
-    "ta-IN": "ta",
-    "te-IN": "te",
-    "kn-IN": "kn",
-    "gu-IN": "gu",
-  };
-  return lookup[languageCode] ?? "en";
+  const lang = TRANSLATE_TTS_LANGUAGES[languageCode];
+  if (!lang) {
+    throw new Error(`TTS is not supported for language ${languageCode}`);
+  }
+  return lang;
 }
 
 export async function generateSpeech(text: string, languageCode: string) {

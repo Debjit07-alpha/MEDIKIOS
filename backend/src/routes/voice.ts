@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { generateSpeech } from "../services/tts";
+import { generateSpeech, isTtsLanguageCode } from "../services/tts";
 import multer from "multer";
 import { isSupportedLanguageCode, transcribeAudio } from "../services/stt";
 import { GoogleProviderUnavailableError } from "../services/googleCredentials";
@@ -21,7 +21,7 @@ router.post("/speak", async (req, res) => {
       });
     }
 
-    if (!isSupportedLanguageCode(languageCode)) {
+    if (!isTtsLanguageCode(languageCode)) {
       return res.status(400).json({
         success: false,
         error: "A supported languageCode is required",

@@ -3,14 +3,20 @@ import type { protos } from "@google-cloud/speech";
 import { assertGoogleCredentials } from "./googleCredentials";
 
 export const SUPPORTED_LANGUAGE_CODES = [
-  "en-IN",
-  "hi-IN",
+  "as-IN",
   "bn-IN",
+  "en-IN",
+  "gu-IN",
+  "hi-IN",
+  "kn-IN",
+  "ml-IN",
   "mr-IN",
+  "ne-IN",
+  "or-IN",
+  "pa-IN",
   "ta-IN",
   "te-IN",
-  "kn-IN",
-  "gu-IN",
+  "ur-IN",
 ] as const;
 
 export type SupportedLanguageCode = (typeof SUPPORTED_LANGUAGE_CODES)[number];

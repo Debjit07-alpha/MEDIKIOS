@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { getLanguage } from "./kiosk-data";
+import { getLanguageConfig } from "./languages";
 import { translate, type TranslationKey } from "./i18n";
 import { KioskContext } from "./kiosk-context";
 
@@ -13,7 +13,7 @@ export function useLanguage() {
   const { language } = useKiosk();
   return {
     language,
-    profile: getLanguage(language),
+    profile: getLanguageConfig(language),
     t: (key: TranslationKey) => translate(language, key),
   };
 }

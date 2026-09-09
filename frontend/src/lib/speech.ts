@@ -1,9 +1,11 @@
 /** Backend-first voice transport with browser speech as a resilience fallback. */
 
-const API_URL = import.meta.env["VITE_API_URL"] || "http://localhost:5000";
-const FALLBACK_LOCALE = "en-IN";
+import { DEFAULT_LANGUAGE, type SpeechLocale } from "./languages";
 
-let currentLocale = FALLBACK_LOCALE;
+const API_URL = import.meta.env["VITE_API_URL"] || "http://localhost:5000";
+const FALLBACK_LOCALE: SpeechLocale = DEFAULT_LANGUAGE.locale;
+
+let currentLocale: string = FALLBACK_LOCALE;
 let activeAudio: HTMLAudioElement | null = null;
 let activeObjectUrl: string | null = null;
 let activeRequest: AbortController | null = null;

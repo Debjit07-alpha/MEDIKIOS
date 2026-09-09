@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { HelpCircle, Home, Check } from "lucide-react";
 import { MediKioskLogo } from "./MediKioskLogo";
-import { STEPS, type StepId, LANGUAGES } from "@/lib/kiosk-data";
+import { STEPS, type StepId } from "@/lib/kiosk-data";
+import { getLanguageConfig } from "@/lib/languages";
 import { useKiosk, useLanguage } from "@/lib/kiosk-hooks";
 import { RedFlagOverlay } from "./RedFlagOverlay";
 import { ListenButton } from "./ListenButton";
@@ -21,7 +22,7 @@ export function KioskShell({
   const { t } = useLanguage();
   const navigate = useNavigate();
   const activeIndex = STEPS.findIndex((s) => s.id === step);
-  const lang = LANGUAGES.find((l) => l.code === language);
+  const lang = getLanguageConfig(language);
   const stepLabels = {
     language: t("stepLanguage"),
     consent: t("stepConsent"),
@@ -62,7 +63,7 @@ export function KioskShell({
               onClick={() => navigate({ to: "/language" })}
               className="min-h-11 rounded-full border border-border bg-card px-4 text-base font-semibold"
             >
-              {lang?.native ?? "English"}
+              {lang.nativeName}
             </button>
             <Link
               to="/help"
