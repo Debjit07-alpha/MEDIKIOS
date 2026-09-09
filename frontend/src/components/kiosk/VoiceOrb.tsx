@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Mic, Loader2, Volume2, Check, Square } from "lucide-react";
 import {
   createRecognition,
+  getRecognitionGeneration,
+  getSpeechLocale,
   matchVoiceToOption,
   recognizeFreeFormVoice,
   speak,
@@ -21,13 +23,15 @@ type Props = {
 };
 
 export function VoiceOrb({ prompt, matches, onResolved }: Props) {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const [state, setState] = useState<VoiceState>("idle");
   const [transcript, setTranscript] = useState("");
   const [error, setError] = useState(false);
   const recorder = useRef<MediaRecorder | null>(null);
   const stream = useRef<MediaStream | null>(null);
   const timers = useRef<number[]>([]);
+  /** True when the patient tapped stop or navigated away mid-recording. */
+  const cancelledRecording = useRef(false);
 
   const clearTimers = useCallback(() => {
     timers.current.forEach((id) => window.clearTimeout(id));
@@ -41,6 +45,10 @@ export function VoiceOrb({ prompt, matches, onResolved }: Props) {
   }, []);
 
   useEffect(() => {
+    console.info("[VOICE DEBUG] VoiceOrb mounted/reset", {
+      selectedLanguage: language,
+      speechLocale: getSpeechLocale(),
+    });
     setState("idle");
     setTranscript("");
     setError(false);
@@ -48,13 +56,15 @@ export function VoiceOrb({ prompt, matches, onResolved }: Props) {
     stopRecognition();
     stopRecording();
     stopSpeaking();
+    cancelledRecording.current = true;
     return () => {
       clearTimers();
       stopRecognition();
       stopRecording();
       stopSpeaking();
+      cancelledRecording.current = true;
     };
-  }, [prompt, clearTimers, stopRecording]);
+  }, [prompt, clearTimers, stopRecording, language]);
 
   const handleResult = useCallback(
     (optionId: string | null, heard: string) => {
@@ -89,45 +99,19 @@ export function VoiceOrb({ prompt, matches, onResolved }: Props) {
     [matches, onResolved, t],
   );
 
-  const start = async () => {
-    if (state === "listening") {
-      stopRecognition();
-      stopRecording();
-      return;
-    }
-    if (state !== "idle") return;
-    setError(false);
-    setTranscript("");
-    stopSpeaking();
-
-    setState("listening");
-
-    // PRIMARY: browser SpeechRecognition (no backend required).
-    if (createRecognition()) {
-      console.info("Voice input: browser SpeechRecognition (primary)");
-      recognizeFreeFormVoice(matches)
-        .then((result) => handleResult(result.optionId, result.transcript))
-        .catch((error) => {
-          console.error("Browser speech recognition failed", error);
-          setError(true);
-          setState("idle");
-        });
-      return;
-    }
-
-    // FALLBACK: browser SpeechRecognition is unavailable, so use the
-    // MediaRecorder + backend STT path instead.
-    console.info("Voice input: browser SpeechRecognition unavailable, using backend STT");
+  const startBackendRecording = useCallback(async () => {
+    console.info("[VOICE DEBUG] Backend STT fallback engaged", {
+      speechLocale: getSpeechLocale(),
+    });
     if (typeof MediaRecorder === "undefined" || !navigator.mediaDevices?.getUserMedia) {
       setError(true);
       setState("idle");
       return;
     }
 
+    cancelledRecording.current = false;
     try {
-      console.info("Microphone permission requested");
       const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      console.info("Microphone permission granted");
       stream.current = mediaStream;
       const chunks: BlobPart[] = [];
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
@@ -146,6 +130,10 @@ export function VoiceOrb({ prompt, matches, onResolved }: Props) {
       mediaRecorder.onstop = async () => {
         mediaStream.getTracks().forEach((track) => track.stop());
         stream.current = null;
+        if (cancelledRecording.current) {
+          setState("idle");
+          return;
+        }
         setState("processing");
         try {
           const result = await transcribeAudio(new Blob(chunks, { type: mimeType }));
@@ -165,6 +153,52 @@ export function VoiceOrb({ prompt, matches, onResolved }: Props) {
       setError(true);
       setState("idle");
     }
+  }, [handleResult, matches, stopRecording]);
+
+  const start = async () => {
+    if (state === "listening") {
+      cancelledRecording.current = true;
+      stopRecognition();
+      stopRecording();
+      return;
+    }
+    if (state !== "idle") return;
+    setError(false);
+    setTranscript("");
+    stopSpeaking();
+
+    setState("listening");
+
+    // PRIMARY: browser SpeechRecognition (no backend required).
+    if (createRecognition()) {
+      console.info("[VOICE DEBUG] Voice input: browser SpeechRecognition (primary)", {
+        recognitionLocale: getSpeechLocale(),
+      });
+      const generationAtStart = getRecognitionGeneration();
+      recognizeFreeFormVoice(matches)
+        .then((result) => handleResult(result.optionId, result.transcript))
+        .catch((error: Error & { code?: string }) => {
+          if (getRecognitionGeneration() !== generationAtStart) {
+            setState("idle");
+            return;
+          }
+          if (error.code === "no-speech" || error.code === "cancelled") {
+            setError(false);
+            setState("idle");
+            return;
+          }
+          console.warn("[VOICE DEBUG] Browser recognition failed; using backend STT", error);
+          void startBackendRecording();
+        });
+      return;
+    }
+
+    // FALLBACK: browser SpeechRecognition is unavailable, so use the
+    // MediaRecorder + backend STT path instead.
+    console.info("[VOICE DEBUG] Voice input: browser SpeechRecognition unavailable", {
+      speechLocale: getSpeechLocale(),
+    });
+    void startBackendRecording();
   };
 
   const copy = {

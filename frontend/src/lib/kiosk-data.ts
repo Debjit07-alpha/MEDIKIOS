@@ -37,6 +37,11 @@ export function getLanguage(code: LanguageCode) {
   return LANGUAGES.find((language) => language.code === code) ?? DEFAULT_LANGUAGE;
 }
 
+/** Single source of truth: every voice subsystem must derive its locale here. */
+export function getSpeechLocaleFromLanguage(code: LanguageCode): SpeechLocale {
+  return getLanguage(code).speech;
+}
+
 export const STEPS = [
   { id: "language", label: "Language", to: "/language" },
   { id: "consent", label: "Consent", to: "/consent" },

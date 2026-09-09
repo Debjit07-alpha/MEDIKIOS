@@ -5,7 +5,7 @@ import {
   type DocKind,
   type ExtractedDoc,
   type LanguageCode,
-  getLanguage,
+  getSpeechLocaleFromLanguage,
   isLanguageCode,
 } from "./kiosk-data";
 import { setSpeechLocale } from "./speech";
@@ -103,8 +103,13 @@ export function KioskProvider({ children }: { children: ReactNode }) {
   }, [state]);
 
   useEffect(() => {
-    setSpeechLocale(getLanguage(state.language).speech);
-    document.documentElement.lang = getLanguage(state.language).speech;
+    const speechLocale = getSpeechLocaleFromLanguage(state.language);
+    setSpeechLocale(speechLocale);
+    document.documentElement.lang = speechLocale;
+    console.info("[VOICE DEBUG] Language changed after navigation", {
+      selectedLanguage: state.language,
+      speechLocale,
+    });
   }, [state.language]);
 
   const patch = useCallback(

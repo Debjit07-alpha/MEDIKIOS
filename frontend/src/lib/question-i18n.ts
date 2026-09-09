@@ -339,3 +339,9 @@ export function localizeQuestion(question: Question, language: LanguageCode): Qu
     })),
   };
 }
+
+/** True when the language actually ships a localized prompt for this question. */
+export function hasLocalizedQuestionPrompt(language: LanguageCode, questionId: string): boolean {
+  if (language === "en") return true;
+  return Boolean(copy[language]?.[questionId]?.prompt);
+}

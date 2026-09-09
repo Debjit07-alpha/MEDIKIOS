@@ -24,7 +24,7 @@ router.post("/speak", async (req, res) => {
     if (!isSupportedLanguageCode(languageCode)) {
       return res.status(400).json({
         success: false,
-        error: "languageCode is required",
+        error: "A supported languageCode is required",
       });
     }
 

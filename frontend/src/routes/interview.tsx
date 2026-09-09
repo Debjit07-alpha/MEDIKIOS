@@ -1,12 +1,13 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Check, Mic } from "lucide-react";
 import { KioskShell } from "@/components/kiosk/KioskShell";
 import { ListenButton } from "@/components/kiosk/ListenButton";
 import { VoiceOrb } from "@/components/kiosk/VoiceOrb";
 import { questionsForMode, type Question } from "@/lib/kiosk-data";
-import { localizeQuestion } from "@/lib/question-i18n";
+import { hasLocalizedQuestionPrompt, localizeQuestion } from "@/lib/question-i18n";
 import { useKiosk, useLanguage } from "@/lib/kiosk-hooks";
+import { getSpeechLocale } from "@/lib/speech";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -46,6 +47,16 @@ function InterviewPage() {
   const localizedQuestion = question ? localizeQuestion(question, language) : undefined;
   const selected = question ? (answers[question.id] ?? []) : [];
   const voiceAnswerText = question ? (voiceAnswers[question.id] ?? "").trim() : "";
+
+  useEffect(() => {
+    if (!question) return;
+    console.info("[VOICE DEBUG] Interview question shown", {
+      selectedLanguage: language,
+      speechLocale: getSpeechLocale(),
+      questionId: question.id,
+      localizedPromptAvailable: hasLocalizedQuestionPrompt(language, question.id),
+    });
+  }, [question, language]);
 
   if (!question) return null;
 
