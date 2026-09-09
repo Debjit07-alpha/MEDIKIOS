@@ -21,16 +21,6 @@ Use a calm, trustworthy healthcare visual language suitable for an Indian govern
 The frontend should feel like a guided healthcare assistant rather than a conventional website. Optimize the complete experience for a patient standing in front of a touchscreen kiosk with minimal assistance.
 u can follow this
 
-This project was built with [Lovable](https://lovable.dev).
-
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/313f608c-0773-49bb-af0a-a602640569a7).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
-
 ## Development
 
 Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
