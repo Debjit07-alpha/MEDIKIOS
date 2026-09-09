@@ -1,0 +1,815 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import {
+  ArrowLeft,
+  AlertTriangle,
+  CheckCircle2,
+  FileHeart,
+  FlaskConical,
+  Hospital,
+  ListChecks,
+  Loader2,
+  Maximize2,
+  Minimize2,
+  Pill,
+  RotateCcw,
+  ScanSearch,
+  Search,
+  ShieldAlert,
+  Stethoscope,
+  Upload,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react";
+import { KioskShell, PageHeading } from "@/components/kiosk/KioskShell";
+import { ListenButton } from "@/components/kiosk/ListenButton";
+import { api, type OcrAnalyzeResponse, type OcrConfidence } from "@/lib/api";
+import { cn } from "@/lib/utils";
+
+export const Route = createFileRoute("/ocr-lab")({
+  head: () => ({
+    meta: [
+      { title: "Medical document analysis — MediKiosk" },
+      {
+        name: "description",
+        content:
+          "OCR (Tesseract.js) plus AI (Gemini) reads messy and handwritten prescriptions into a structured, reviewable medical document.",
+      },
+    ],
+  }),
+  component: OcrLabPage,
+});
+
+const STAGES = [
+  "Uploading document",
+  "Reading prescription",
+  "Extracting text",
+  "Analyzing medical information",
+  "Preparing results",
+];
+
+const ALLOWED_FILE_TYPES = /^image\/(jpeg|png|webp|bmp|x-ms-bmp|tiff|tif)$/;
+
+type FilterKind = "all" | "medicines" | "investigations" | "procedures" | "diagnoses";
+
+const FILTERS: { kind: FilterKind; label: string }[] = [
+  { kind: "all", label: "All" },
+  { kind: "medicines", label: "Medicines" },
+  { kind: "investigations", label: "Investigations" },
+  { kind: "procedures", label: "Procedures" },
+  { kind: "diagnoses", label: "Diagnoses" },
+];
+
+function ConfidenceBadge({ level }: { level: OcrConfidence }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-bold",
+        level === "high" && "bg-success-soft text-success",
+        level === "medium" && "bg-warning-soft text-warning-foreground",
+        level === "low" && "bg-destructive-soft text-destructive",
+      )}
+      aria-label={`${level} confidence`}
+    >
+      {level === "high" ? (
+        <CheckCircle2 className="size-4" aria-hidden />
+      ) : level === "medium" ? (
+        <ShieldAlert className="size-4" aria-hidden />
+      ) : (
+        <AlertTriangle className="size-4" aria-hidden />
+      )}
+      {level === "high"
+        ? "High confidence"
+        : level === "medium"
+          ? "Medium confidence"
+          : "Low — needs review"}
+    </span>
+  );
+}
+
+function Evidence({ evidence }: { evidence: string }) {
+  if (!evidence) return null;
+  return (
+    <details className="mt-3 rounded-xl border border-border bg-muted/40 p-3">
+      <summary className="cursor-pointer text-sm font-bold text-muted-foreground">
+        Evidence in document
+      </summary>
+      <p className="mt-2 whitespace-pre-wrap text-base">{evidence}</p>
+    </details>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: string | null }) {
+  if (!value) return null;
+  return (
+    <div className="flex flex-wrap gap-x-3 gap-y-1">
+      <dt className="min-w-[130px] text-sm font-bold uppercase tracking-wider text-muted-foreground">
+        {label}
+      </dt>
+      <dd className="text-lg font-semibold">{value}</dd>
+    </div>
+  );
+}
+
+function MedicineCard({
+  medicine,
+}: {
+  medicine: NonNullable<OcrAnalyzeResponse["analysis"]>["medicines"][number];
+}) {
+  return (
+    <article className="rounded-3xl border-2 border-border bg-card p-5 shadow-card">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <h3 className="flex items-center gap-2 text-2xl font-extrabold">
+          <Pill className="size-6 shrink-0 text-primary" aria-hidden />
+          {medicine.name}
+        </h3>
+        <ConfidenceBadge level={medicine.confidence} />
+      </div>
+      {medicine.strength ? (
+        <p className="mt-2 text-xl font-bold text-muted-foreground">{medicine.strength}</p>
+      ) : null}
+      <dl className="mt-4 grid gap-3">
+        <DetailRow label="Dosage" value={medicine.dosage} />
+        <DetailRow label="Frequency" value={medicine.frequency} />
+        <DetailRow label="Route" value={medicine.route} />
+        <DetailRow label="Duration" value={medicine.duration} />
+        <DetailRow label="Instructions" value={medicine.instructions} />
+      </dl>
+      <Evidence evidence={medicine.evidence} />
+    </article>
+  );
+}
+
+function InvestigationCard({
+  investigation,
+}: {
+  investigation: NonNullable<OcrAnalyzeResponse["analysis"]>["investigations"][number];
+}) {
+  return (
+    <article className="rounded-3xl border-2 border-border bg-card p-5 shadow-card">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <h3 className="flex items-center gap-2 text-2xl font-extrabold">
+          <FlaskConical className="size-6 shrink-0 text-primary" aria-hidden />
+          {investigation.test}
+        </h3>
+        <ConfidenceBadge level={investigation.confidence} />
+      </div>
+      <dl className="mt-4 grid gap-3">
+        {investigation.value ? (
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
+            <dt className="min-w-[130px] text-sm font-bold uppercase tracking-wider text-muted-foreground">
+              Result
+            </dt>
+            <dd className="text-2xl font-extrabold text-primary">
+              {investigation.value}
+              {investigation.unit ? (
+                <span className="ml-1 text-lg font-semibold text-muted-foreground">
+                  {investigation.unit}
+                </span>
+              ) : null}
+            </dd>
+          </div>
+        ) : null}
+        <div className="flex flex-wrap gap-x-3 gap-y-1">
+          <dt className="min-w-[130px] text-sm font-bold uppercase tracking-wider text-muted-foreground">
+            Reference range
+          </dt>
+          <dd className="text-lg font-semibold">
+            {investigation.referenceRange ?? "Not provided in document"}
+          </dd>
+        </div>
+      </dl>
+      <Evidence evidence={investigation.evidence} />
+    </article>
+  );
+}
+
+function ProcedureCard({
+  procedure,
+}: {
+  procedure: NonNullable<OcrAnalyzeResponse["analysis"]>["procedures"][number];
+}) {
+  return (
+    <article className="rounded-3xl border-2 border-border bg-card p-5 shadow-card">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <h3 className="flex items-center gap-2 text-2xl font-extrabold">
+          <Hospital className="size-6 shrink-0 text-primary" aria-hidden />
+          {procedure.name}
+        </h3>
+        <ConfidenceBadge level={procedure.confidence} />
+      </div>
+      <dl className="mt-4 grid gap-3">
+        <DetailRow label="Details" value={procedure.details} />
+        <DetailRow label="Date" value={procedure.date} />
+      </dl>
+      <Evidence evidence={procedure.evidence} />
+    </article>
+  );
+}
+
+function itemMatches(query: string, ...fields: (string | null | undefined)[]): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return fields.some((field) => typeof field === "string" && field.toLowerCase().includes(q));
+}
+
+function OcrLabPage() {
+  const navigate = useNavigate();
+  const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [stage, setStage] = useState<number | null>(null);
+  const [result, setResult] = useState<OcrAnalyzeResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<FilterKind>("all");
+  const [zoom, setZoom] = useState<number | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const stageTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      if (stageTimerRef.current) clearInterval(stageTimerRef.current);
+    };
+  }, [previewUrl]);
+
+  const pickFile = () => fileInputRef.current?.click();
+
+  const runAnalysis = async (selected: File) => {
+    setFile(selected);
+    setResult(null);
+    setError(null);
+    setQuery("");
+    setFilter("all");
+    setStage(0);
+
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(URL.createObjectURL(selected));
+
+    if (stageTimerRef.current) clearInterval(stageTimerRef.current);
+    stageTimerRef.current = setInterval(() => {
+      setStage((prev) => (prev !== null && prev < STAGES.length - 1 ? prev + 1 : prev));
+    }, 1400);
+
+    try {
+      const response = await api.ocr.analyzeDocument(selected);
+      setResult(response);
+    } catch (err) {
+      const code = (err as { code?: string })?.code;
+      console.error(err);
+      setError(ocrMessageFor(code));
+    } finally {
+      if (stageTimerRef.current) clearInterval(stageTimerRef.current);
+      setStage(null);
+    }
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = event.target.files?.[0];
+    if (event.target) event.target.value = "";
+    if (!selected) return;
+    if (!ALLOWED_FILE_TYPES.test(selected.type)) {
+      setError("Please choose a JPG, PNG, WEBP, BMP or TIFF image.");
+      return;
+    }
+    await runAnalysis(selected);
+  };
+
+  const analysis = result?.analysis ?? null;
+
+  const spokenSummary = useMemo(() => {
+    if (!analysis) return "";
+    const lines: string[] = [
+      `This is a ${(analysis.documentType || "medical document").replace(/_/g, " ")}.`,
+    ];
+    if (analysis.medicines.length) {
+      lines.push(`${analysis.medicines.length} medicines.`);
+      for (const m of analysis.medicines.slice(0, 6)) {
+        lines.push(
+          `${m.name}${m.strength ? ` ${m.strength}` : ""}${m.frequency ? `, ${m.frequency}` : ""}.`,
+        );
+      }
+    }
+    if (analysis.investigations.length) {
+      lines.push(`${analysis.investigations.length} investigation values.`);
+    }
+    if (analysis.diagnoses.length) {
+      lines.push(`Documented diagnoses: ${analysis.diagnoses.map((d) => d.name).join(", ")}.`);
+    }
+    if (analysis.instructions.length) {
+      lines.push(`Instructions: ${analysis.instructions.join(". ")}.`);
+    }
+    return lines.join(" ");
+  }, [analysis]);
+
+  const medicines = useMemo(
+    () =>
+      (analysis?.medicines ?? []).filter((m) =>
+        itemMatches(
+          query,
+          m.name,
+          m.strength,
+          m.dosage,
+          m.frequency,
+          m.route,
+          m.duration,
+          m.instructions,
+        ),
+      ),
+    [analysis, query],
+  );
+  const investigations = useMemo(
+    () =>
+      (analysis?.investigations ?? []).filter((i) =>
+        itemMatches(query, i.test, i.value, i.unit, i.referenceRange),
+      ),
+    [analysis, query],
+  );
+  const procedures = useMemo(
+    () => (analysis?.procedures ?? []).filter((p) => itemMatches(query, p.name, p.details, p.date)),
+    [analysis, query],
+  );
+  const diagnoses = useMemo(
+    () =>
+      (analysis?.diagnoses ?? [])
+        .filter((d) => d.status === "documented")
+        .filter((d) => itemMatches(query, d.name)),
+    [analysis, query],
+  );
+  const instructions = useMemo(
+    () => (analysis?.instructions ?? []).filter((text) => itemMatches(query, text)),
+    [analysis, query],
+  );
+
+  const hasResults =
+    medicines.length > 0 ||
+    investigations.length > 0 ||
+    procedures.length > 0 ||
+    diagnoses.length > 0 ||
+    instructions.length > 0;
+
+  const showSection = (kind: FilterKind) => filter === "all" || filter === kind;
+
+  const renderImage = ({ fixed }: { fixed: boolean }) => (
+    <div
+      className={cn(
+        "relative overflow-hidden rounded-2xl border-2 border-border bg-muted",
+        fixed ? "h-[26rem]" : "h-full",
+      )}
+    >
+      {previewUrl ? (
+        <img
+          src={previewUrl}
+          alt="Uploaded prescription"
+          className={cn(
+            "h-full w-full object-contain",
+            zoom && fixed ? "transition-transform duration-200" : "",
+          )}
+          style={zoom && fixed ? { transform: `scale(${zoom})` } : undefined}
+        />
+      ) : null}
+    </div>
+  );
+
+  return (
+    <KioskShell showSteps={false}>
+      <input
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/bmp,image/tiff"
+        capture="environment"
+        className="hidden"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+      />
+
+      <div className="mb-6 flex items-center gap-4">
+        <button
+          type="button"
+          onClick={() => navigate({ to: "/papers" })}
+          className="inline-flex min-h-11 items-center gap-2 rounded-full border-2 border-border bg-card px-4 text-base font-bold"
+          aria-label="Back to papers"
+        >
+          <ArrowLeft className="size-5" /> Back
+        </button>
+        <PageHeading
+          title="Medical Document Analysis"
+          subtitle="Tesseract.js OCR + Gemini reads messy and handwritten prescriptions"
+        />
+      </div>
+
+      {error ? (
+        <div
+          role="alert"
+          className="mb-6 rounded-2xl border-2 border-destructive/40 bg-destructive-soft p-5 text-destructive"
+        >
+          <p className="text-lg font-bold">{error}</p>
+          <button
+            type="button"
+            onClick={() => file && void runAnalysis(file)}
+            className="mt-3 inline-flex min-h-12 items-center gap-2 rounded-full bg-primary px-5 text-base font-bold text-primary-foreground"
+          >
+            <RotateCcw className="size-5" /> Retry
+          </button>
+        </div>
+      ) : null}
+
+      {stage !== null ? (
+        <section
+          aria-live="polite"
+          className="animate-rise rounded-4xl border-2 border-primary/30 bg-card p-8 shadow-card"
+        >
+          <h2 className="text-2xl font-extrabold">Reading your document</h2>
+          <ol className="mt-6 grid gap-3">
+            {STAGES.map((label, index) => {
+              const done = index < stage;
+              const activeStage = index === stage;
+              return (
+                <li
+                  key={label}
+                  className={cn(
+                    "flex items-center gap-3 rounded-2xl border-2 px-5 py-3 text-lg font-semibold",
+                    activeStage && "border-primary bg-primary-soft text-primary",
+                    done && "border-success/40 bg-success-soft text-success",
+                    !activeStage && !done && "border-border text-muted-foreground",
+                  )}
+                >
+                  {done ? (
+                    <CheckCircle2 className="size-6 shrink-0" aria-hidden />
+                  ) : activeStage ? (
+                    <Loader2 className="size-6 shrink-0 animate-spin" aria-hidden />
+                  ) : (
+                    <span
+                      className="grid size-6 shrink-0 place-items-center rounded-full border text-sm"
+                      aria-hidden
+                    >
+                      {index + 1}
+                    </span>
+                  )}
+                  {label}
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      ) : result ? (
+        <div className="animate-rise grid gap-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
+          {/* Image preview */}
+          <aside className="lg:sticky lg:top-6 lg:self-start">
+            <div className="rounded-4xl border-2 border-border bg-card p-5 shadow-card">
+              <h3 className="flex items-center gap-2 text-xl font-extrabold">
+                <FileHeart className="size-6 text-primary" aria-hidden /> Original document
+              </h3>
+              {renderImage({ fixed: true })}
+              <div
+                className="mt-4 flex flex-wrap items-center gap-2"
+                role="group"
+                aria-label="Image controls"
+              >
+                <button
+                  type="button"
+                  onClick={() => setZoom((z) => Math.min(3, (z ?? 1) + 0.25))}
+                  className="grid size-11 place-items-center rounded-full border-2 border-border bg-card"
+                  aria-label="Zoom in"
+                >
+                  <ZoomIn className="size-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setZoom((z) => (z === null || z - 0.25 < 0.25 ? null : z - 0.25))}
+                  className="grid size-11 place-items-center rounded-full border-2 border-border bg-card"
+                  aria-label="Zoom out"
+                >
+                  <ZoomOut className="size-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setZoom(null)}
+                  className={cn(
+                    "min-h-11 rounded-full border-2 px-4 text-sm font-bold",
+                    zoom === null
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-card",
+                  )}
+                >
+                  Fit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFullscreen(true)}
+                  className="grid size-11 place-items-center rounded-full border-2 border-border bg-card"
+                  aria-label="View fullscreen"
+                >
+                  <Maximize2 className="size-5" />
+                </button>
+              </div>
+              {result.ocr?.confidence !== undefined ? (
+                <p className="mt-4 text-base text-muted-foreground">
+                  OCR confidence:{" "}
+                  <span className="font-bold text-foreground">
+                    {Math.round(result.ocr.confidence)}%
+                  </span>
+                </p>
+              ) : null}
+            </div>
+          </aside>
+
+          {/* Results */}
+          <main>
+            <div className="mb-4 flex flex-col gap-3 rounded-2xl border-2 border-warning/40 bg-warning-soft p-4">
+              <p className="flex items-center gap-2 text-base font-bold text-warning-foreground">
+                <ShieldAlert className="size-5 shrink-0" aria-hidden />
+                Please verify extracted information with a doctor before acting on it.
+              </p>
+              {result.warning ? (
+                <p className="text-base font-semibold text-warning-foreground">{result.warning}</p>
+              ) : null}
+            </div>
+
+            {result.documentId ? (
+              <p className="mb-4 flex items-center gap-2 text-base font-semibold text-success">
+                <CheckCircle2 className="size-5 shrink-0" aria-hidden />
+                Saved to patient records.
+              </p>
+            ) : null}
+
+            {!analysis ? (
+              <div className="rounded-4xl border-2 border-border bg-card p-8 text-center shadow-card">
+                <ScanSearch className="mx-auto size-14 text-primary" aria-hidden />
+                <h2 className="mt-4 text-2xl font-extrabold">
+                  Text extracted — medical analysis unavailable
+                </h2>
+                <p className="mt-2 text-lg text-muted-foreground">
+                  The raw text was read successfully, but the AI analysis could not be completed
+                  right now.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => file && void runAnalysis(file)}
+                  className="mt-6 inline-flex min-h-14 items-center gap-2 rounded-full bg-primary px-8 text-lg font-extrabold text-primary-foreground shadow-lift"
+                >
+                  <RotateCcw className="size-5" /> Retry analysis
+                </button>
+              </div>
+            ) : null}
+
+            {analysis ? (
+              <>
+                <div className="flex flex-wrap items-center gap-3 rounded-3xl border-2 border-border bg-card p-4 shadow-card">
+                  <div className="relative min-w-0 flex-1">
+                    <Search
+                      className="pointer-events-none absolute left-4 top-1/2 size-6 -translate-y-1/2 text-muted-foreground"
+                      aria-hidden
+                    />
+                    <input
+                      type="search"
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      placeholder="Search extracted information"
+                      aria-label="Search extracted information"
+                      className="w-full rounded-full border-2 border-border bg-background py-4 pl-14 pr-4 text-lg outline-none focus:border-primary"
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-2" role="group" aria-label="Filter sections">
+                    {FILTERS.map((chip) => (
+                      <button
+                        key={chip.kind}
+                        type="button"
+                        onClick={() => setFilter(chip.kind)}
+                        aria-pressed={filter === chip.kind}
+                        className={cn(
+                          "min-h-11 rounded-full border-2 px-4 text-base font-bold",
+                          filter === chip.kind
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border bg-card text-foreground",
+                        )}
+                      >
+                        {chip.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {result.ocr?.rawText ? (
+                  <ListenButton text={spokenSummary} label="Read summary aloud" />
+                ) : null}
+
+                {showSection("medicines") && medicines.length ? (
+                  <section aria-label="Medicines" className="mt-6">
+                    <h2 className="text-2xl font-extrabold">Medicines</h2>
+                    <div className="mt-3 grid gap-4 xl:grid-cols-2">
+                      {medicines.map((medicine) => (
+                        <MedicineCard key={medicine.name} medicine={medicine} />
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
+                {showSection("investigations") && investigations.length ? (
+                  <section aria-label="Investigations" className="mt-6">
+                    <h2 className="text-2xl font-extrabold">Investigations</h2>
+                    <div className="mt-3 grid gap-4 xl:grid-cols-2">
+                      {investigations.map((investigation) => (
+                        <InvestigationCard key={investigation.test} investigation={investigation} />
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
+                {showSection("procedures") && procedures.length ? (
+                  <section aria-label="Procedures and surgeries" className="mt-6">
+                    <h2 className="text-2xl font-extrabold">Procedures / Surgeries</h2>
+                    <div className="mt-3 grid gap-4 xl:grid-cols-2">
+                      {procedures.map((procedure) => (
+                        <ProcedureCard key={procedure.name} procedure={procedure} />
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
+                {showSection("diagnoses") && (
+                  <section aria-label="Diagnoses documented" className="mt-6">
+                    <h2 className="flex items-center gap-2 text-2xl font-extrabold">
+                      <Stethoscope className="size-7 text-primary" aria-hidden /> Diagnoses
+                      documented
+                    </h2>
+                    {diagnoses.length ? (
+                      <div className="mt-3 grid gap-4 xl:grid-cols-2">
+                        {diagnoses.map((diagnosis) => (
+                          <article
+                            key={diagnosis.name}
+                            className="rounded-3xl border-2 border-border bg-card p-5 shadow-card"
+                          >
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <h3 className="text-2xl font-extrabold">{diagnosis.name}</h3>
+                              <ConfidenceBadge level={diagnosis.confidence} />
+                            </div>
+                            <Evidence evidence={diagnosis.evidence} />
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-3 rounded-3xl border-2 border-border bg-card p-6 text-lg text-muted-foreground shadow-card">
+                        No diagnosis was explicitly documented in this document.
+                      </p>
+                    )}
+                  </section>
+                )}
+
+                {showSection("all") && instructions.length ? (
+                  <section aria-label="Instructions" className="mt-6">
+                    <h2 className="flex items-center gap-2 text-2xl font-extrabold">
+                      <ListChecks className="size-7 text-primary" aria-hidden /> Instructions
+                    </h2>
+                    <ul className="mt-3 grid gap-2">
+                      {instructions.map((instruction, index) => (
+                        <li
+                          key={`${instruction}-${index}`}
+                          className="flex items-start gap-3 rounded-2xl border-2 border-border bg-card p-4 text-lg font-semibold shadow-card"
+                        >
+                          <span
+                            className="mt-1.5 size-2 shrink-0 rounded-full bg-primary"
+                            aria-hidden
+                          />
+                          {instruction}
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ) : null}
+
+                {!hasResults && (query || filter !== "all") ? (
+                  <p className="mt-6 text-lg text-muted-foreground">
+                    No matching entries found for “{query}” in{" "}
+                    {filter === "all" ? "this document" : filter}.
+                  </p>
+                ) : null}
+
+                <details className="mt-6 rounded-3xl border-2 border-border bg-card p-5 shadow-card">
+                  <summary className="cursor-pointer text-lg font-bold">Raw OCR text</summary>
+                  <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap rounded-2xl bg-muted p-4 text-base">
+                    {result.ocr?.rawText || "No text extracted."}
+                  </pre>
+                </details>
+              </>
+            ) : null}
+          </main>
+        </div>
+      ) : (
+        <section aria-label="Upload a document" className="animate-rise grid gap-6 md:grid-cols-2">
+          <button
+            type="button"
+            onClick={pickFile}
+            className="flex min-h-80 flex-col items-center justify-center gap-4 rounded-4xl border-2 border-dashed border-primary/50 bg-card p-8 text-center shadow-card transition-transform hover:-translate-y-1"
+          >
+            <span className="grid size-20 place-items-center rounded-full bg-primary-soft text-primary">
+              <Upload className="size-10" aria-hidden />
+            </span>
+            <span className="text-2xl font-extrabold">Choose a prescription photo</span>
+            <span className="max-w-md text-lg text-muted-foreground">
+              Printed, handwritten or messy prescriptions. Your camera works too.
+            </span>
+            <span className="mt-2 rounded-full bg-accent px-4 py-1 text-sm font-bold text-accent-foreground">
+              JPG · PNG · WEBP · BMP · TIFF
+            </span>
+          </button>
+
+          <div className="flex flex-col justify-center gap-4 rounded-4xl border-2 border-border bg-card p-8 shadow-card">
+            <h2 className="text-2xl font-extrabold">How this works</h2>
+            <ol className="grid gap-3 text-lg">
+              <li className="flex items-start gap-3">
+                <span
+                  className="grid size-7 shrink-0 place-items-center rounded-full bg-primary text-base font-extrabold text-primary-foreground"
+                  aria-hidden
+                >
+                  1
+                </span>
+                <span>
+                  <strong>Tesseract.js</strong> extracts the raw text from your photo.
+                </span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span
+                  className="grid size-7 shrink-0 place-items-center rounded-full bg-primary text-base font-extrabold text-primary-foreground"
+                  aria-hidden
+                >
+                  2
+                </span>
+                <span>
+                  <strong>Gemini</strong> checks both the image and the text, then builds a
+                  structured medical summary.
+                </span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span
+                  className="grid size-7 shrink-0 place-items-center rounded-full bg-primary text-base font-extrabold text-primary-foreground"
+                  aria-hidden
+                >
+                  3
+                </span>
+                <span>
+                  Nothing is guessed. Unclear items are marked <strong>“needs review”</strong>.
+                </span>
+              </li>
+            </ol>
+            <Link
+              to="/papers"
+              className="mt-2 inline-flex min-h-12 items-center gap-2 rounded-full border-2 border-border bg-card px-5 text-base font-bold"
+            >
+              <ArrowLeft className="size-5" /> Use the standard kiosk document reader instead
+            </Link>
+          </div>
+        </section>
+      )}
+
+      {fullscreen && previewUrl ? (
+        <div
+          className="fixed inset-0 z-50 flex flex-col bg-black/95 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Document fullscreen preview"
+          onClick={() => setFullscreen(false)}
+        >
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-lg font-bold text-white">Original document</p>
+            <button
+              type="button"
+              onClick={() => setFullscreen(false)}
+              className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-base font-bold text-white"
+            >
+              <Minimize2 className="size-5" /> Close
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-auto">{renderImage({ fixed: false })}</div>
+        </div>
+      ) : null}
+    </KioskShell>
+  );
+}
+
+const OCR_IMAGE_CODES = new Set([
+  "INVALID_FILE",
+  "FILE_TOO_LARGE",
+  "NO_TEXT",
+  "UNSUPPORTED_TYPE",
+  "NO_IMAGE",
+  "OCR_FAILED",
+]);
+
+function ocrMessageFor(code?: string): string {
+  switch (code) {
+    case "NO_TEXT":
+      return "No readable text was found. Please use a clearer photo.";
+    case "FILE_TOO_LARGE":
+      return "This photo is too large. Please use a smaller image.";
+    case "UNSUPPORTED_TYPE":
+      return "This file type is not supported. Use a JPG, PNG, WEBP, BMP or TIFF image.";
+    case "OCR_FAILED":
+      return "Could not read this document right now. Please try again.";
+    default:
+      return OCR_IMAGE_CODES.has(code ?? "")
+        ? "Unable to read this document. Please try another photo."
+        : "The document could not be analysed. Please try again.";
+  }
+}

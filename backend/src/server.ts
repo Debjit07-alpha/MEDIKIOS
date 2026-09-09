@@ -9,7 +9,8 @@ import OpenAI from "openai";
 import voiceRouter from "./routes/voice";
 import ocrRouter from "./routes/ocr";
 import { supabase } from "./database/supabase";
-import { assertOcrApiKey, ocrImage, ocrHttpResponse } from "./services/ocr";
+import { ocrImage, ocrHttpResponse } from "./services/ocr";
+import { geminiConfigured } from "./services/geminiMedical";
 import {
   DOCTOR_SUMMARY_QUESTION_ID,
   DOCTOR_SUMMARY_RESPONSE_TYPE,
@@ -462,7 +463,7 @@ app.post(
       let structuredData: any = null;
 
       // ---------------------------------------------------
-      // A. Text extraction (OCR.Space)
+      // A. Text extraction (Tesseract.js)
       // ---------------------------------------------------
 
       // When the kiosk has already extracted and reviewed the text,
@@ -648,15 +649,10 @@ app.listen(PORT, () => {
   );
 
   console.log(
-    `OCR: ${assertOcrApiKeySafe() ? "configured (OCR.Space)" : "not configured (set OCR_API_KEY)"}`
+    `Gemini: ${geminiConfigured() ? "configured" : "not configured (set GEMINI_API_KEY)"}`
+  );
+
+  console.log(
+    "OCR: Tesseract.js (in-process, no API key required)"
   );
 });
-
-function assertOcrApiKeySafe(): boolean {
-  try {
-    assertOcrApiKey();
-    return true;
-  } catch {
-    return false;
-  }
-}

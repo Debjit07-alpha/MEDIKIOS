@@ -55,8 +55,6 @@ type OcrErrorCode =
   | "INVALID_FILE"
   | "FILE_TOO_LARGE"
   | "RATE_LIMITED"
-  | "OCR_API_KEY_MISSING"
-  | "OCR_API_KEY_INVALID"
   | "OCR_TIMEOUT"
   | "OCR_SERVICE_UNAVAILABLE";
 
@@ -332,6 +330,25 @@ function PapersPage() {
               </button>
             ))}
           </div>
+
+          <button
+            type="button"
+            onClick={() => navigate({ to: "/ocr-lab" })}
+            className="mt-4 flex min-h-20 w-full items-center gap-4 rounded-3xl border-2 border-dashed border-primary/50 bg-primary-soft/50 p-5 text-left shadow-card"
+          >
+            <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-primary text-primary-foreground">
+              <ScanLine className="size-7" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-2xl font-extrabold leading-tight">
+                Analyse a messy or handwritten prescription
+              </span>
+              <span className="block text-lg text-muted-foreground">
+                Tesseract.js OCR + Gemini AI — experimental document lab
+              </span>
+            </span>
+            <ArrowRight className="size-7 shrink-0 text-muted-foreground" />
+          </button>
 
           <div className="mt-8 flex flex-wrap items-center justify-between gap-4">
             <ListenButton text={t("paperListen")} label={t("listen")} />

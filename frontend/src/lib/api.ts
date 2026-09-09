@@ -97,6 +97,81 @@ export interface OcrResult {
   source: string;
 }
 
+export type OcrConfidence = "high" | "medium" | "low";
+
+export interface OcrMedicine {
+  name: string;
+  strength: string | null;
+  dosage: string | null;
+  frequency: string | null;
+  route: string | null;
+  duration: string | null;
+  instructions: string | null;
+  confidence: OcrConfidence;
+  evidence: string;
+}
+
+export interface OcrInvestigation {
+  test: string;
+  value: string | null;
+  unit: string | null;
+  referenceRange: string | null;
+  confidence: OcrConfidence;
+  evidence: string;
+}
+
+export interface OcrProcedure {
+  name: string;
+  details: string | null;
+  date: string | null;
+  confidence: OcrConfidence;
+  evidence: string;
+}
+
+export interface OcrDiagnosis {
+  name: string;
+  status: "documented" | "inferred" | "uncertain";
+  confidence: OcrConfidence;
+  evidence: string;
+}
+
+export interface OcrDocumentAnalysis {
+  documentType: "prescription" | "lab_report" | "medical_document" | "unknown";
+  patient: { name: string | null; age: string | null; sex: string | null };
+  doctor: { name: string | null; registrationNumber: string | null };
+  date: string | null;
+  medicines: OcrMedicine[];
+  investigations: OcrInvestigation[];
+  procedures: OcrProcedure[];
+  diagnoses: OcrDiagnosis[];
+  instructions: string[];
+  rawOcrText: string;
+  warnings: string[];
+}
+
+export interface OcrPreprocessing {
+  applied: boolean;
+  reason?: string;
+  originalSize?: { width: number; height: number };
+  processedSize?: { width: number; height: number };
+  format?: string;
+}
+
+export interface OcrAnalyzeResponse {
+  success: boolean;
+  ocr: {
+    provider: string;
+    rawText: string;
+    confidence: number;
+    preprocessing: OcrPreprocessing;
+  };
+  analysis: OcrDocumentAnalysis | null;
+  warnings: string[];
+  warning: string | null;
+  documentId?: string | null;
+  imageUrl?: string | null;
+}
+
 export interface TimelineItem {
   id: string;
   date: string;
@@ -111,7 +186,7 @@ export interface DocumentRecord {
   original_file_path?: string;
   raw_ocr_text: string;
   structured_data: PrescriptionAnalysis["analysis"];
-  preprocessing_info?: any;
+  preprocessing_info?: Record<string, unknown>;
   status: string;
   created_at: string;
 }
@@ -140,10 +215,20 @@ async function upload<T>(path: string, formData: FormData): Promise<T> {
 
   const data = await response.json();
   if (!response.ok) {
-    const error = new Error(data.error || "Upload failed");
-    (error as any).code = data.code;
-    (error as any).suggestions = data.suggestions;
-    (error as any).details = data.details;
+    const body = data as {
+      error?: string;
+      code?: string;
+      suggestions?: unknown;
+      details?: unknown;
+    };
+    const error = new Error(body.error || "Upload failed") as Error & {
+      code: string;
+      suggestions: unknown;
+      details: unknown;
+    };
+    error.code = body.code || "";
+    error.suggestions = body.suggestions;
+    error.details = body.details;
     throw error;
   }
   return data as T;
@@ -252,6 +337,12 @@ export const api = {
       formData.append("file", file);
       return upload<OcrResult>("/api/ocr", formData);
     },
+
+    analyzeDocument: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      return upload<OcrAnalyzeResponse>("/api/ocr/analyze", formData);
+    },
   },
 
   timeline: {
@@ -273,7 +364,13 @@ export const api = {
       voiceAnswers: Record<string, string>;
       documents: unknown[];
       redFlag: { label: string; detail: string; at: string } | null;
-      doctorSummaryRows: { qid?: string; section: string; field: string; label: string; value: string }[];
+      doctorSummaryRows: {
+        qid?: string;
+        section: string;
+        field: string;
+        label: string;
+        value: string;
+      }[];
       patientSummaryRows: { section: string; field: string; label: string; value: string }[];
       shareScope: "abha" | "hospital";
     }) =>

@@ -51,7 +51,13 @@ function DonePage() {
   const [summaryError, setSummaryError] = useState(false);
 
   useEffect(() => {
-    if (!summaryConfirmed || !patient?.uhid) return;
+    if (!summaryConfirmed) return;
+
+    if (!patient?.uhid) {
+      setLoadingSummary(false);
+      setSummaryError(true);
+      return;
+    }
 
     let cancelled = false;
 
@@ -111,7 +117,7 @@ function DonePage() {
         </div>
       </div>
 
-      {shared && (
+      {summaryConfirmed && (
         <div className="mx-auto mt-8 max-w-4xl">
           {loadingSummary ? (
             <div className="flex flex-col items-center gap-4 rounded-4xl border-2 border-primary bg-primary-soft p-10 shadow-card">

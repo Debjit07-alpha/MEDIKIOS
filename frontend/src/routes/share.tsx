@@ -8,6 +8,25 @@ import { api } from "@/lib/api";
 import { buildEnglishSummaryRows, buildSummary } from "@/lib/buildSummary";
 import { translate } from "@/lib/i18n";
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error("Doctor summary request timed out")),
+      ms,
+    );
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
+}
+
 export const Route = createFileRoute("/share")({
   head: () => ({
     meta: [
@@ -55,21 +74,24 @@ function SharePage() {
     );
 
     try {
-      await api.summary.generateDoctor({
-        patientId: patient?.uhid || `demo-${Date.now()}`,
-        patientLanguage: language,
-        careMode: mode,
-        patient: patient
-          ? { name: patient.name, age: patient.age, sex: patient.sex, uhid: patient.uhid }
-          : null,
-        answers,
-        voiceAnswers,
-        documents: documents as unknown[],
-        redFlag,
-        doctorSummaryRows,
-        patientSummaryRows,
-        shareScope,
-      });
+      await withTimeout(
+        api.summary.generateDoctor({
+          patientId: patient?.uhid || `demo-${Date.now()}`,
+          patientLanguage: language,
+          careMode: mode,
+          patient: patient
+            ? { name: patient.name, age: patient.age, sex: patient.sex, uhid: patient.uhid }
+            : null,
+          answers,
+          voiceAnswers,
+          documents: documents as unknown[],
+          redFlag,
+          doctorSummaryRows,
+          patientSummaryRows,
+          shareScope,
+        }),
+        15000,
+      );
     } catch (err) {
       console.warn("Doctor summary generation failed, proceeding anyway:", err);
     }

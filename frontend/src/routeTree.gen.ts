@@ -18,6 +18,7 @@ import { Route as HelpRouteImport } from './routes/help'
 import { Route as IdentityRouteImport } from './routes/identity'
 import { Route as InterviewRouteImport } from './routes/interview'
 import { Route as LanguageRouteImport } from './routes/language'
+import { Route as OcrLabRouteImport } from './routes/ocr-lab'
 import { Route as PapersRouteImport } from './routes/papers'
 import { Route as ShareRouteImport } from './routes/share'
 import { Route as StaffRouteImport } from './routes/staff'
@@ -75,6 +76,11 @@ const InterviewRoute = InterviewRouteImport.update({
 const LanguageRoute = LanguageRouteImport.update({
   id: '/language',
   path: '/language',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OcrLabRoute = OcrLabRouteImport.update({
+  id: '/ocr-lab',
+  path: '/ocr-lab',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PapersRoute = PapersRouteImport.update({
@@ -153,6 +159,7 @@ export interface FileRoutesByFullPath {
   '/identity': typeof IdentityRouteWithChildren
   '/interview': typeof InterviewRoute
   '/language': typeof LanguageRoute
+  '/ocr-lab': typeof OcrLabRoute
   '/papers': typeof PapersRoute
   '/share': typeof ShareRoute
   '/staff': typeof StaffRouteWithChildren
@@ -177,6 +184,7 @@ export interface FileRoutesByTo {
   '/identity': typeof IdentityRouteWithChildren
   '/interview': typeof InterviewRoute
   '/language': typeof LanguageRoute
+  '/ocr-lab': typeof OcrLabRoute
   '/papers': typeof PapersRoute
   '/share': typeof ShareRoute
   '/summary': typeof SummaryRoute
@@ -201,6 +209,7 @@ export interface FileRoutesById {
   '/identity': typeof IdentityRouteWithChildren
   '/interview': typeof InterviewRoute
   '/language': typeof LanguageRoute
+  '/ocr-lab': typeof OcrLabRoute
   '/papers': typeof PapersRoute
   '/share': typeof ShareRoute
   '/staff': typeof StaffRouteWithChildren
@@ -227,6 +236,7 @@ export interface FileRouteTypes {
     | '/identity'
     | '/interview'
     | '/language'
+    | '/ocr-lab'
     | '/papers'
     | '/share'
     | '/staff'
@@ -251,6 +261,7 @@ export interface FileRouteTypes {
     | '/identity'
     | '/interview'
     | '/language'
+    | '/ocr-lab'
     | '/papers'
     | '/share'
     | '/summary'
@@ -274,6 +285,7 @@ export interface FileRouteTypes {
     | '/identity'
     | '/interview'
     | '/language'
+    | '/ocr-lab'
     | '/papers'
     | '/share'
     | '/staff'
@@ -299,6 +311,7 @@ export interface RootRouteChildren {
   IdentityRoute: typeof IdentityRouteWithChildren
   InterviewRoute: typeof InterviewRoute
   LanguageRoute: typeof LanguageRoute
+  OcrLabRoute: typeof OcrLabRoute
   PapersRoute: typeof PapersRoute
   ShareRoute: typeof ShareRoute
   StaffRoute: typeof StaffRouteWithChildren
@@ -369,6 +382,13 @@ declare module '@tanstack/react-router' {
       path: '/language'
       fullPath: '/language'
       preLoaderRoute: typeof LanguageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ocr-lab': {
+      id: '/ocr-lab'
+      path: '/ocr-lab'
+      fullPath: '/ocr-lab'
+      preLoaderRoute: typeof OcrLabRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/papers': {
@@ -538,6 +558,7 @@ const rootRouteChildren: RootRouteChildren = {
   IdentityRoute: IdentityRouteWithChildren,
   InterviewRoute: InterviewRoute,
   LanguageRoute: LanguageRoute,
+  OcrLabRoute: OcrLabRoute,
   PapersRoute: PapersRoute,
   ShareRoute: ShareRoute,
   StaffRoute: StaffRouteWithChildren,
