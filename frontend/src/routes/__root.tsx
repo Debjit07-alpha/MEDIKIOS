@@ -89,7 +89,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         property: "og:description",
         content:
-          "Voice-guided clinical history, OCR of hospital papers and physician-ready summaries at the OPD kiosk.",
+          "Voice-guided clinical history, reading of hospital documents and physician-ready summaries at the OPD kiosk.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

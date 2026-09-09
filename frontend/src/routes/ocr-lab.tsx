@@ -24,75 +24,74 @@ import {
 import { KioskShell, PageHeading } from "@/components/kiosk/KioskShell";
 import { ListenButton } from "@/components/kiosk/ListenButton";
 import { api, type OcrAnalyzeResponse, type OcrConfidence } from "@/lib/api";
+import { useLanguage } from "@/lib/kiosk-hooks";
+import type { TranslationKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/ocr-lab")({
   head: () => ({
     meta: [
-      { title: "Medical document analysis — MediKiosk" },
+      { title: "Medical Document Reader — MediKiosk" },
       {
         name: "description",
         content:
-          "OCR (Tesseract.js) plus AI (Gemini) reads messy and handwritten prescriptions into a structured, reviewable medical document.",
+          "Upload a prescription or medical document and get important information in an easy-to-read format.",
       },
     ],
   }),
   component: OcrLabPage,
 });
 
-const STAGES = [
-  "Uploading document",
-  "Reading prescription",
-  "Extracting text",
-  "Analyzing medical information",
-  "Preparing results",
+const STAGES: TranslationKey[] = [
+  "ocrStageUploading",
+  "ocrStageReading",
+  "ocrStageOrganizing",
+  "ocrStageChecking",
+  "ocrStagePreparing",
 ];
 
 const ALLOWED_FILE_TYPES = /^image\/(jpeg|png|webp|bmp|x-ms-bmp|tiff|tif)$/;
 
 type FilterKind = "all" | "medicines" | "investigations" | "procedures" | "diagnoses";
 
-const FILTERS: { kind: FilterKind; label: string }[] = [
-  { kind: "all", label: "All" },
-  { kind: "medicines", label: "Medicines" },
-  { kind: "investigations", label: "Investigations" },
-  { kind: "procedures", label: "Procedures" },
-  { kind: "diagnoses", label: "Diagnoses" },
+const FILTERS: { kind: FilterKind; key: TranslationKey }[] = [
+  { kind: "all", key: "ocrFilterAll" },
+  { kind: "medicines", key: "ocrFilterMedicines" },
+  { kind: "investigations", key: "ocrFilterInvestigations" },
+  { kind: "procedures", key: "ocrFilterProcedures" },
+  { kind: "diagnoses", key: "ocrFilterDiagnoses" },
 ];
 
 function ConfidenceBadge({ level }: { level: OcrConfidence }) {
+  const { t } = useLanguage();
+  if (level === "high") return null;
+  const medium = level === "medium";
   return (
     <span
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-bold",
-        level === "high" && "bg-success-soft text-success",
-        level === "medium" && "bg-warning-soft text-warning-foreground",
-        level === "low" && "bg-destructive-soft text-destructive",
+        medium && "bg-warning-soft text-warning-foreground",
+        !medium && "bg-destructive-soft text-destructive",
       )}
-      aria-label={`${level} confidence`}
+      aria-label={t(medium ? "ocrPleaseCheck" : "ocrNeedsReview")}
     >
-      {level === "high" ? (
-        <CheckCircle2 className="size-4" aria-hidden />
-      ) : level === "medium" ? (
+      {medium ? (
         <ShieldAlert className="size-4" aria-hidden />
       ) : (
         <AlertTriangle className="size-4" aria-hidden />
       )}
-      {level === "high"
-        ? "High confidence"
-        : level === "medium"
-          ? "Medium confidence"
-          : "Low — needs review"}
+      {t(medium ? "ocrPleaseCheck" : "ocrNeedsReview")}
     </span>
   );
 }
 
 function Evidence({ evidence }: { evidence: string }) {
+  const { t } = useLanguage();
   if (!evidence) return null;
   return (
     <details className="mt-3 rounded-xl border border-border bg-muted/40 p-3">
       <summary className="cursor-pointer text-sm font-bold text-muted-foreground">
-        Evidence in document
+        {t("ocrEvidence")}
       </summary>
       <p className="mt-2 whitespace-pre-wrap text-base">{evidence}</p>
     </details>
@@ -116,6 +115,7 @@ function MedicineCard({
 }: {
   medicine: NonNullable<OcrAnalyzeResponse["analysis"]>["medicines"][number];
 }) {
+  const { t } = useLanguage();
   return (
     <article className="rounded-3xl border-2 border-border bg-card p-5 shadow-card">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -129,11 +129,11 @@ function MedicineCard({
         <p className="mt-2 text-xl font-bold text-muted-foreground">{medicine.strength}</p>
       ) : null}
       <dl className="mt-4 grid gap-3">
-        <DetailRow label="Dosage" value={medicine.dosage} />
-        <DetailRow label="Frequency" value={medicine.frequency} />
-        <DetailRow label="Route" value={medicine.route} />
-        <DetailRow label="Duration" value={medicine.duration} />
-        <DetailRow label="Instructions" value={medicine.instructions} />
+        <DetailRow label={t("ocrDosage")} value={medicine.dosage} />
+        <DetailRow label={t("ocrFrequency")} value={medicine.frequency} />
+        <DetailRow label={t("ocrRoute")} value={medicine.route} />
+        <DetailRow label={t("ocrDuration")} value={medicine.duration} />
+        <DetailRow label={t("ocrInstructions")} value={medicine.instructions} />
       </dl>
       <Evidence evidence={medicine.evidence} />
     </article>
@@ -145,6 +145,7 @@ function InvestigationCard({
 }: {
   investigation: NonNullable<OcrAnalyzeResponse["analysis"]>["investigations"][number];
 }) {
+  const { t } = useLanguage();
   return (
     <article className="rounded-3xl border-2 border-border bg-card p-5 shadow-card">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -158,7 +159,7 @@ function InvestigationCard({
         {investigation.value ? (
           <div className="flex flex-wrap gap-x-3 gap-y-1">
             <dt className="min-w-[130px] text-sm font-bold uppercase tracking-wider text-muted-foreground">
-              Result
+              {t("ocrResult")}
             </dt>
             <dd className="text-2xl font-extrabold text-primary">
               {investigation.value}
@@ -172,10 +173,10 @@ function InvestigationCard({
         ) : null}
         <div className="flex flex-wrap gap-x-3 gap-y-1">
           <dt className="min-w-[130px] text-sm font-bold uppercase tracking-wider text-muted-foreground">
-            Reference range
+            {t("ocrReferenceRange")}
           </dt>
           <dd className="text-lg font-semibold">
-            {investigation.referenceRange ?? "Not provided in document"}
+            {investigation.referenceRange ?? t("ocrNotProvided")}
           </dd>
         </div>
       </dl>
@@ -189,6 +190,7 @@ function ProcedureCard({
 }: {
   procedure: NonNullable<OcrAnalyzeResponse["analysis"]>["procedures"][number];
 }) {
+  const { t } = useLanguage();
   return (
     <article className="rounded-3xl border-2 border-border bg-card p-5 shadow-card">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -199,8 +201,8 @@ function ProcedureCard({
         <ConfidenceBadge level={procedure.confidence} />
       </div>
       <dl className="mt-4 grid gap-3">
-        <DetailRow label="Details" value={procedure.details} />
-        <DetailRow label="Date" value={procedure.date} />
+        <DetailRow label={t("ocrDetails")} value={procedure.details} />
+        <DetailRow label={t("ocrDate")} value={procedure.date} />
       </dl>
       <Evidence evidence={procedure.evidence} />
     </article>
@@ -215,6 +217,7 @@ function itemMatches(query: string, ...fields: (string | null | undefined)[]): b
 
 function OcrLabPage() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [stage, setStage] = useState<number | null>(null);
@@ -259,7 +262,7 @@ function OcrLabPage() {
     } catch (err) {
       const code = (err as { code?: string })?.code;
       console.error(err);
-      setError(ocrMessageFor(code));
+      setError(ocrMessageFor(code, t));
     } finally {
       if (stageTimerRef.current) clearInterval(stageTimerRef.current);
       setStage(null);
@@ -271,7 +274,7 @@ function OcrLabPage() {
     if (event.target) event.target.value = "";
     if (!selected) return;
     if (!ALLOWED_FILE_TYPES.test(selected.type)) {
-      setError("Please choose a JPG, PNG, WEBP, BMP or TIFF image.");
+      setError(t("ocrErrUnsupported"));
       return;
     }
     await runAnalysis(selected);
@@ -362,7 +365,7 @@ function OcrLabPage() {
       {previewUrl ? (
         <img
           src={previewUrl}
-          alt="Uploaded prescription"
+          alt={t("ocrOriginalDocument")}
           className={cn(
             "h-full w-full object-contain",
             zoom && fixed ? "transition-transform duration-200" : "",
@@ -389,14 +392,11 @@ function OcrLabPage() {
           type="button"
           onClick={() => navigate({ to: "/papers" })}
           className="inline-flex min-h-11 items-center gap-2 rounded-full border-2 border-border bg-card px-4 text-base font-bold"
-          aria-label="Back to papers"
+          aria-label={t("ocrBackToDocs")}
         >
-          <ArrowLeft className="size-5" /> Back
+          <ArrowLeft className="size-5" /> {t("back")}
         </button>
-        <PageHeading
-          title="Medical Document Analysis"
-          subtitle="Tesseract.js OCR + Gemini reads messy and handwritten prescriptions"
-        />
+        <PageHeading title={t("ocrReaderTitle")} subtitle={t("ocrReaderSubtitle")} />
       </div>
 
       {error ? (
@@ -410,7 +410,7 @@ function OcrLabPage() {
             onClick={() => file && void runAnalysis(file)}
             className="mt-3 inline-flex min-h-12 items-center gap-2 rounded-full bg-primary px-5 text-base font-bold text-primary-foreground"
           >
-            <RotateCcw className="size-5" /> Retry
+            <RotateCcw className="size-5" /> {t("ocrTryAgain")}
           </button>
         </div>
       ) : null}
@@ -420,14 +420,14 @@ function OcrLabPage() {
           aria-live="polite"
           className="animate-rise rounded-4xl border-2 border-primary/30 bg-card p-8 shadow-card"
         >
-          <h2 className="text-2xl font-extrabold">Reading your document</h2>
+          <h2 className="text-2xl font-extrabold">{t("ocrPreparingTitle")}</h2>
           <ol className="mt-6 grid gap-3">
-            {STAGES.map((label, index) => {
+            {STAGES.map((key, index) => {
               const done = index < stage;
               const activeStage = index === stage;
               return (
                 <li
-                  key={label}
+                  key={key}
                   className={cn(
                     "flex items-center gap-3 rounded-2xl border-2 px-5 py-3 text-lg font-semibold",
                     activeStage && "border-primary bg-primary-soft text-primary",
@@ -447,7 +447,7 @@ function OcrLabPage() {
                       {index + 1}
                     </span>
                   )}
-                  {label}
+                  {t(key)}
                 </li>
               );
             })}
@@ -459,19 +459,19 @@ function OcrLabPage() {
           <aside className="lg:sticky lg:top-6 lg:self-start">
             <div className="rounded-4xl border-2 border-border bg-card p-5 shadow-card">
               <h3 className="flex items-center gap-2 text-xl font-extrabold">
-                <FileHeart className="size-6 text-primary" aria-hidden /> Original document
+                <FileHeart className="size-6 text-primary" aria-hidden /> {t("ocrOriginalDocument")}
               </h3>
               {renderImage({ fixed: true })}
               <div
                 className="mt-4 flex flex-wrap items-center gap-2"
                 role="group"
-                aria-label="Image controls"
+                aria-label={t("ocrOriginalDocument")}
               >
                 <button
                   type="button"
                   onClick={() => setZoom((z) => Math.min(3, (z ?? 1) + 0.25))}
                   className="grid size-11 place-items-center rounded-full border-2 border-border bg-card"
-                  aria-label="Zoom in"
+                  aria-label={t("ocrZoomIn")}
                 >
                   <ZoomIn className="size-5" />
                 </button>
@@ -479,7 +479,7 @@ function OcrLabPage() {
                   type="button"
                   onClick={() => setZoom((z) => (z === null || z - 0.25 < 0.25 ? null : z - 0.25))}
                   className="grid size-11 place-items-center rounded-full border-2 border-border bg-card"
-                  aria-label="Zoom out"
+                  aria-label={t("ocrZoomOut")}
                 >
                   <ZoomOut className="size-5" />
                 </button>
@@ -493,25 +493,17 @@ function OcrLabPage() {
                       : "border-border bg-card",
                   )}
                 >
-                  Fit
+                  {t("ocrFit")}
                 </button>
                 <button
                   type="button"
                   onClick={() => setFullscreen(true)}
                   className="grid size-11 place-items-center rounded-full border-2 border-border bg-card"
-                  aria-label="View fullscreen"
+                  aria-label={t("ocrFullscreen")}
                 >
                   <Maximize2 className="size-5" />
                 </button>
               </div>
-              {result.ocr?.confidence !== undefined ? (
-                <p className="mt-4 text-base text-muted-foreground">
-                  OCR confidence:{" "}
-                  <span className="font-bold text-foreground">
-                    {Math.round(result.ocr.confidence)}%
-                  </span>
-                </p>
-              ) : null}
             </div>
           </aside>
 
@@ -520,7 +512,7 @@ function OcrLabPage() {
             <div className="mb-4 flex flex-col gap-3 rounded-2xl border-2 border-warning/40 bg-warning-soft p-4">
               <p className="flex items-center gap-2 text-base font-bold text-warning-foreground">
                 <ShieldAlert className="size-5 shrink-0" aria-hidden />
-                Please verify extracted information with a doctor before acting on it.
+                {t("ocrVerifyInfo")}
               </p>
               {result.warning ? (
                 <p className="text-base font-semibold text-warning-foreground">{result.warning}</p>
@@ -530,74 +522,81 @@ function OcrLabPage() {
             {result.documentId ? (
               <p className="mb-4 flex items-center gap-2 text-base font-semibold text-success">
                 <CheckCircle2 className="size-5 shrink-0" aria-hidden />
-                Saved to patient records.
+                {t("ocrSavedToRecords")}
               </p>
             ) : null}
 
             {!analysis ? (
               <div className="rounded-4xl border-2 border-border bg-card p-8 text-center shadow-card">
                 <ScanSearch className="mx-auto size-14 text-primary" aria-hidden />
-                <h2 className="mt-4 text-2xl font-extrabold">
-                  Text extracted — medical analysis unavailable
-                </h2>
-                <p className="mt-2 text-lg text-muted-foreground">
-                  The raw text was read successfully, but the AI analysis could not be completed
-                  right now.
-                </p>
+                <h2 className="mt-4 text-2xl font-extrabold">{t("ocrUnavailableTitle")}</h2>
+                <p className="mt-2 text-lg text-muted-foreground">{t("ocrUnavailableText")}</p>
                 <button
                   type="button"
                   onClick={() => file && void runAnalysis(file)}
                   className="mt-6 inline-flex min-h-14 items-center gap-2 rounded-full bg-primary px-8 text-lg font-extrabold text-primary-foreground shadow-lift"
                 >
-                  <RotateCcw className="size-5" /> Retry analysis
+                  <RotateCcw className="size-5" /> {t("ocrTryAgain")}
                 </button>
               </div>
             ) : null}
 
             {analysis ? (
               <>
-                <div className="flex flex-wrap items-center gap-3 rounded-3xl border-2 border-border bg-card p-4 shadow-card">
-                  <div className="relative min-w-0 flex-1">
-                    <Search
-                      className="pointer-events-none absolute left-4 top-1/2 size-6 -translate-y-1/2 text-muted-foreground"
-                      aria-hidden
-                    />
-                    <input
-                      type="search"
-                      value={query}
-                      onChange={(event) => setQuery(event.target.value)}
-                      placeholder="Search extracted information"
-                      aria-label="Search extracted information"
-                      className="w-full rounded-full border-2 border-border bg-background py-4 pl-14 pr-4 text-lg outline-none focus:border-primary"
-                    />
+                <section aria-label={t("ocrMedicalInformation")}>
+                  <h2 className="flex items-center gap-2 text-3xl font-extrabold">
+                    <ScanSearch className="size-8 text-primary" aria-hidden />
+                    {t("ocrMedicalInformation")}
+                  </h2>
+                  <div className="mt-4 flex flex-wrap items-center gap-3 rounded-3xl border-2 border-border bg-card p-4 shadow-card">
+                    <div className="relative min-w-0 flex-1">
+                      <Search
+                        className="pointer-events-none absolute left-4 top-1/2 size-6 -translate-y-1/2 text-muted-foreground"
+                        aria-hidden
+                      />
+                      <input
+                        type="search"
+                        value={query}
+                        onChange={(event) => setQuery(event.target.value)}
+                        placeholder={t("ocrSearchPlaceholder")}
+                        aria-label={t("ocrSearchPlaceholder")}
+                        className="w-full rounded-full border-2 border-border bg-background py-4 pl-14 pr-4 text-lg outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div
+                      className="flex flex-wrap gap-2"
+                      role="group"
+                      aria-label={t("ocrFilterAll")}
+                    >
+                      {FILTERS.map((chip) => (
+                        <button
+                          key={chip.kind}
+                          type="button"
+                          onClick={() => setFilter(chip.kind)}
+                          aria-pressed={filter === chip.kind}
+                          className={cn(
+                            "min-h-11 rounded-full border-2 px-4 text-base font-bold",
+                            filter === chip.kind
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border bg-card text-foreground",
+                          )}
+                        >
+                          {t(chip.key)}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2" role="group" aria-label="Filter sections">
-                    {FILTERS.map((chip) => (
-                      <button
-                        key={chip.kind}
-                        type="button"
-                        onClick={() => setFilter(chip.kind)}
-                        aria-pressed={filter === chip.kind}
-                        className={cn(
-                          "min-h-11 rounded-full border-2 px-4 text-base font-bold",
-                          filter === chip.kind
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-border bg-card text-foreground",
-                        )}
-                      >
-                        {chip.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                </section>
 
                 {result.ocr?.rawText ? (
-                  <ListenButton text={spokenSummary} label="Read summary aloud" />
+                  <div className="mt-4">
+                    <ListenButton text={spokenSummary} label={t("ocrReadAloud")} />
+                  </div>
                 ) : null}
 
                 {showSection("medicines") && medicines.length ? (
-                  <section aria-label="Medicines" className="mt-6">
-                    <h2 className="text-2xl font-extrabold">Medicines</h2>
+                  <section aria-label={t("ocrMedicines")} className="mt-6">
+                    <h2 className="text-2xl font-extrabold">{t("ocrMedicines")}</h2>
                     <div className="mt-3 grid gap-4 xl:grid-cols-2">
                       {medicines.map((medicine) => (
                         <MedicineCard key={medicine.name} medicine={medicine} />
@@ -607,8 +606,8 @@ function OcrLabPage() {
                 ) : null}
 
                 {showSection("investigations") && investigations.length ? (
-                  <section aria-label="Investigations" className="mt-6">
-                    <h2 className="text-2xl font-extrabold">Investigations</h2>
+                  <section aria-label={t("ocrTestResults")} className="mt-6">
+                    <h2 className="text-2xl font-extrabold">{t("ocrTestResults")}</h2>
                     <div className="mt-3 grid gap-4 xl:grid-cols-2">
                       {investigations.map((investigation) => (
                         <InvestigationCard key={investigation.test} investigation={investigation} />
@@ -618,8 +617,8 @@ function OcrLabPage() {
                 ) : null}
 
                 {showSection("procedures") && procedures.length ? (
-                  <section aria-label="Procedures and surgeries" className="mt-6">
-                    <h2 className="text-2xl font-extrabold">Procedures / Surgeries</h2>
+                  <section aria-label={t("ocrProcedures")} className="mt-6">
+                    <h2 className="text-2xl font-extrabold">{t("ocrProcedures")}</h2>
                     <div className="mt-3 grid gap-4 xl:grid-cols-2">
                       {procedures.map((procedure) => (
                         <ProcedureCard key={procedure.name} procedure={procedure} />
@@ -629,10 +628,10 @@ function OcrLabPage() {
                 ) : null}
 
                 {showSection("diagnoses") && (
-                  <section aria-label="Diagnoses documented" className="mt-6">
+                  <section aria-label={t("ocrDiagnosesDocumented")} className="mt-6">
                     <h2 className="flex items-center gap-2 text-2xl font-extrabold">
-                      <Stethoscope className="size-7 text-primary" aria-hidden /> Diagnoses
-                      documented
+                      <Stethoscope className="size-7 text-primary" aria-hidden />
+                      {t("ocrDiagnosesDocumented")}
                     </h2>
                     {diagnoses.length ? (
                       <div className="mt-3 grid gap-4 xl:grid-cols-2">
@@ -651,16 +650,17 @@ function OcrLabPage() {
                       </div>
                     ) : (
                       <p className="mt-3 rounded-3xl border-2 border-border bg-card p-6 text-lg text-muted-foreground shadow-card">
-                        No diagnosis was explicitly documented in this document.
+                        {t("ocrNoDiagnosis")}
                       </p>
                     )}
                   </section>
                 )}
 
                 {showSection("all") && instructions.length ? (
-                  <section aria-label="Instructions" className="mt-6">
+                  <section aria-label={t("ocrAdditionalInstructions")} className="mt-6">
                     <h2 className="flex items-center gap-2 text-2xl font-extrabold">
-                      <ListChecks className="size-7 text-primary" aria-hidden /> Instructions
+                      <ListChecks className="size-7 text-primary" aria-hidden />
+                      {t("ocrAdditionalInstructions")}
                     </h2>
                     <ul className="mt-3 grid gap-2">
                       {instructions.map((instruction, index) => (
@@ -681,15 +681,16 @@ function OcrLabPage() {
 
                 {!hasResults && (query || filter !== "all") ? (
                   <p className="mt-6 text-lg text-muted-foreground">
-                    No matching entries found for “{query}” in{" "}
-                    {filter === "all" ? "this document" : filter}.
+                    {t("ocrNoMatches").replace("{query}", query)}
                   </p>
                 ) : null}
 
                 <details className="mt-6 rounded-3xl border-2 border-border bg-card p-5 shadow-card">
-                  <summary className="cursor-pointer text-lg font-bold">Raw OCR text</summary>
+                  <summary className="cursor-pointer text-lg font-bold">
+                    {t("ocrOriginalText")}
+                  </summary>
                   <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap rounded-2xl bg-muted p-4 text-base">
-                    {result.ocr?.rawText || "No text extracted."}
+                    {result.ocr?.rawText || t("ocrOriginalNoText")}
                   </pre>
                 </details>
               </>
@@ -697,7 +698,10 @@ function OcrLabPage() {
           </main>
         </div>
       ) : (
-        <section aria-label="Upload a document" className="animate-rise grid gap-6 md:grid-cols-2">
+        <section
+          aria-label={t("ocrUploadTitle")}
+          className="animate-rise grid gap-6 md:grid-cols-2"
+        >
           <button
             type="button"
             onClick={pickFile}
@@ -706,17 +710,15 @@ function OcrLabPage() {
             <span className="grid size-20 place-items-center rounded-full bg-primary-soft text-primary">
               <Upload className="size-10" aria-hidden />
             </span>
-            <span className="text-2xl font-extrabold">Choose a prescription photo</span>
-            <span className="max-w-md text-lg text-muted-foreground">
-              Printed, handwritten or messy prescriptions. Your camera works too.
-            </span>
+            <span className="text-2xl font-extrabold">{t("ocrUploadTitle")}</span>
+            <span className="max-w-md text-lg text-muted-foreground">{t("ocrUploadText")}</span>
             <span className="mt-2 rounded-full bg-accent px-4 py-1 text-sm font-bold text-accent-foreground">
               JPG · PNG · WEBP · BMP · TIFF
             </span>
           </button>
 
           <div className="flex flex-col justify-center gap-4 rounded-4xl border-2 border-border bg-card p-8 shadow-card">
-            <h2 className="text-2xl font-extrabold">How this works</h2>
+            <h2 className="text-2xl font-extrabold">{t("ocrHowItHelps")}</h2>
             <ol className="grid gap-3 text-lg">
               <li className="flex items-start gap-3">
                 <span
@@ -726,7 +728,7 @@ function OcrLabPage() {
                   1
                 </span>
                 <span>
-                  <strong>Tesseract.js</strong> extracts the raw text from your photo.
+                  <strong>{t("ocrStep1Title")}</strong> {t("ocrStep1Text")}
                 </span>
               </li>
               <li className="flex items-start gap-3">
@@ -737,8 +739,7 @@ function OcrLabPage() {
                   2
                 </span>
                 <span>
-                  <strong>Gemini</strong> checks both the image and the text, then builds a
-                  structured medical summary.
+                  <strong>{t("ocrStep2Title")}</strong> {t("ocrStep2Text")}
                 </span>
               </li>
               <li className="flex items-start gap-3">
@@ -749,7 +750,7 @@ function OcrLabPage() {
                   3
                 </span>
                 <span>
-                  Nothing is guessed. Unclear items are marked <strong>“needs review”</strong>.
+                  <strong>{t("ocrStep3Title")}</strong> {t("ocrStep3Text")}
                 </span>
               </li>
             </ol>
@@ -757,7 +758,7 @@ function OcrLabPage() {
               to="/papers"
               className="mt-2 inline-flex min-h-12 items-center gap-2 rounded-full border-2 border-border bg-card px-5 text-base font-bold"
             >
-              <ArrowLeft className="size-5" /> Use the standard kiosk document reader instead
+              <ArrowLeft className="size-5" /> {t("ocrStandardReader")}
             </Link>
           </div>
         </section>
@@ -768,17 +769,17 @@ function OcrLabPage() {
           className="fixed inset-0 z-50 flex flex-col bg-black/95 p-4"
           role="dialog"
           aria-modal="true"
-          aria-label="Document fullscreen preview"
+          aria-label={t("ocrOriginalDocument")}
           onClick={() => setFullscreen(false)}
         >
           <div className="mb-3 flex items-center justify-between">
-            <p className="text-lg font-bold text-white">Original document</p>
+            <p className="text-lg font-bold text-white">{t("ocrOriginalDocument")}</p>
             <button
               type="button"
               onClick={() => setFullscreen(false)}
               className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-base font-bold text-white"
             >
-              <Minimize2 className="size-5" /> Close
+              <Minimize2 className="size-5" /> {t("ocrClose")}
             </button>
           </div>
           <div className="min-h-0 flex-1 overflow-auto">{renderImage({ fixed: false })}</div>
@@ -797,19 +798,17 @@ const OCR_IMAGE_CODES = new Set([
   "OCR_FAILED",
 ]);
 
-function ocrMessageFor(code?: string): string {
+function ocrMessageFor(code: string | undefined, t: (key: TranslationKey) => string): string {
   switch (code) {
     case "NO_TEXT":
-      return "No readable text was found. Please use a clearer photo.";
+      return t("ocrErrNoText");
     case "FILE_TOO_LARGE":
-      return "This photo is too large. Please use a smaller image.";
+      return t("ocrErrTooLarge");
     case "UNSUPPORTED_TYPE":
-      return "This file type is not supported. Use a JPG, PNG, WEBP, BMP or TIFF image.";
+      return t("ocrErrUnsupported");
     case "OCR_FAILED":
-      return "Could not read this document right now. Please try again.";
+      return t("ocrErrFailed");
     default:
-      return OCR_IMAGE_CODES.has(code ?? "")
-        ? "Unable to read this document. Please try another photo."
-        : "The document could not be analysed. Please try again.";
+      return OCR_IMAGE_CODES.has(code ?? "") ? t("ocrErrGeneric") : t("ocrErrAnalyze");
   }
 }

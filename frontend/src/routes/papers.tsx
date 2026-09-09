@@ -341,11 +341,9 @@ function PapersPage() {
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-2xl font-extrabold leading-tight">
-                Analyse a messy or handwritten prescription
+                {t("ocrEntryTitle")}
               </span>
-              <span className="block text-lg text-muted-foreground">
-                Tesseract.js OCR + Gemini AI — experimental document lab
-              </span>
+              <span className="block text-lg text-muted-foreground">{t("ocrEntrySubtitle")}</span>
             </span>
             <ArrowRight className="size-7 shrink-0 text-muted-foreground" />
           </button>
