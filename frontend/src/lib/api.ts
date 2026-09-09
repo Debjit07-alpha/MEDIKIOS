@@ -1,6 +1,5 @@
 const API_URL = import.meta.env["VITE_API_URL"] || "http://localhost:5000";
 
-// --- TYPES & INTERFACES ---
 export interface Patient {
   id: string;
   name: string;
@@ -8,29 +7,72 @@ export interface Patient {
   gender: string;
   abha_number?: string;
   aadhaar_id?: string;
+  uhid?: string;
 }
 
 export interface Medicine {
-  writtenName: string;
+  medicineName: string | null;
   genericName: string | null;
+  brandName: string | null;
   strength: string | null;
   dosage: string | null;
   frequency: string | null;
-  purpose: string | null;
+  route: string | null;
+  duration: string | null;
+  quantity: string | null;
+  timing: string | null;
+  instructions: string | null;
+  verificationRequired: boolean;
   confidence: number;
-  needsVerification: boolean;
+}
+
+export interface PatientInfo {
+  name: string | null;
+  age: string | null;
+  gender: string | null;
+  dob: string | null;
+  patientId: string | null;
+}
+
+export interface DoctorInfo {
+  name: string | null;
+  registrationNumber: string | null;
+  clinic: string | null;
+  contact: string | null;
+}
+
+export interface Vitals {
+  bloodPressure: string | null;
+  pulse: string | null;
+  temperature: string | null;
+  weight: string | null;
+  spo2: string | null;
+  bloodSugar: string | null;
 }
 
 export interface PrescriptionAnalysis {
+  success: boolean;
   documentId: string;
   imageUrl: string;
+  originalImageUrl?: string;
+  preprocessing?: {
+    applied: boolean;
+    originalSize?: { width: number; height: number };
+    processedSize?: { width: number; height: number };
+    format?: string;
+  };
   analysis: {
+    rawText: string;
+    confidence: number;
+    patient: PatientInfo;
+    doctor: DoctorInfo;
     medicines: Medicine[];
-    summary?: string;
-    doctorInfo?: {
-      name?: string;
-      hospital?: string;
-    };
+    diagnosis: string[];
+    vitals: Vitals;
+    tests: string[];
+    followUp: string | null;
+    instructions: string[];
+    overallStatus: "verified" | "needs_verification" | "low_quality";
   };
 }
 
@@ -40,6 +82,13 @@ export interface IntakeData {
   vitals?: Record<string, unknown>;
 }
 
+export interface InterviewResponseInput {
+  patientId: string;
+  questionId: string;
+  responseText: string;
+  responseType: string;
+}
+
 export interface TimelineItem {
   id: string;
   date: string;
@@ -47,7 +96,17 @@ export interface TimelineItem {
   description: string;
 }
 
-// --- CORE REQUEST FUNCTIONS ---
+export interface DocumentRecord {
+  id: string;
+  patient_id: string;
+  file_path: string;
+  original_file_path?: string;
+  raw_ocr_text: string;
+  structured_data: PrescriptionAnalysis["analysis"];
+  preprocessing_info?: any;
+  status: string;
+  created_at: string;
+}
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
@@ -73,12 +132,15 @@ async function upload<T>(path: string, formData: FormData): Promise<T> {
 
   const data = await response.json();
   if (!response.ok) {
-    throw new Error(data.error || "Upload failed");
+    const error = new Error(data.error || "Upload failed");
+    (error as any).code = data.code;
+    (error as any).suggestions = data.suggestions;
+    (error as any).details = data.details;
+    throw error;
   }
   return data as T;
 }
 
-// --- API EXPORTS ---
 export const api = {
   health: () => request<{ message: string }>("/"),
 
@@ -102,6 +164,7 @@ export const api = {
             age: 52,
             gender: "Male",
             abha_number: body.value,
+            uhid: "DGH/2026/8421",
           };
         }
         if (body.method === "aadhaar") {
@@ -111,6 +174,7 @@ export const api = {
             age: 58,
             gender: "Female",
             aadhaar_id: "demo-fingerprint",
+            uhid: "DGH/2026/8421",
           };
         }
         throw err;
@@ -145,6 +209,14 @@ export const api = {
     get: (patientId: string) => request<IntakeData>(`/api/intake/${patientId}`),
   },
 
+  interview: {
+    saveResponse: (body: InterviewResponseInput) =>
+      request<{ success: boolean }>("/api/interview/response", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+  },
+
   documents: {
     analyze: async (patientId: string, file: File) => {
       const formData = new FormData();
@@ -153,14 +225,13 @@ export const api = {
       return upload<PrescriptionAnalysis>("/api/documents/prescription/analyze", formData);
     },
 
-    // Fixed 'any' by using Record<string, unknown>
     verify: (id: string, correctedData: Record<string, unknown>) =>
       request<{ success: boolean }>(`/api/documents/${id}/verify`, {
         method: "POST",
         body: JSON.stringify(correctedData),
       }),
 
-    list: (patientId: string) => request<unknown[]>(`/api/documents/${patientId}`),
+    list: (patientId: string) => request<DocumentRecord[]>(`/api/documents/${patientId}`),
   },
 
   timeline: {
@@ -172,31 +243,3 @@ export const api = {
     patient: (id: string) => request<Patient>(`/api/staff/patients/${id}`),
   },
 };
-// --- Add these interfaces to your frontend/src/lib/api.ts ---
-
-export interface Medicine {
-  writtenName: string;
-  genericName: string | null;
-  strength: string | null;
-  dosage: string | null;
-  frequency: string | null;
-  purpose: string | null;
-  confidence: number;
-  needsVerification: boolean;
-}
-
-export interface PrescriptionAnalysis {
-  success: boolean;
-  documentId: string;
-  imageUrl: string;
-  analysis: {
-    medicines: Medicine[];
-    summary?: string;
-    doctorInfo?: {
-      name?: string;
-      hospital?: string;
-    };
-  };
-}
-
-// ... keep the rest of your api.ts as is

@@ -44,6 +44,7 @@ export const translationKeys = [
   "voiceGotIt",
   "voiceHint",
   "voiceError",
+  "voiceAnswerRecognized",
   "consentTitle",
   "consentSubtitle",
   "consentPlay",
@@ -231,6 +232,7 @@ const english: TranslationTable = {
   voiceGotIt: "Got it",
   voiceHint: "Touch the microphone and talk normally",
   voiceError: "Voice is unavailable right now. Please try again or choose an answer.",
+  voiceAnswerRecognized: "Voice answer recognized",
   consentTitle: "May I ask you some health questions?",
   consentSubtitle: "Please listen to the message, then choose.",
   consentPlay: "Play consent",
@@ -414,6 +416,7 @@ const translations: Partial<Record<LanguageCode, Partial<TranslationTable>>> = {
     callStaff: "स्टाफ को बुलाएँ",
     continueQuestions: "सवाल जारी रखें",
     possibleEmergency: "आपातकाल के संकेत मिले हैं",
+    voiceAnswerRecognized: "आपका जवाब समझ में आया",
   },
   mr: {
     guidedAssistant: "मार्गदर्शित आरोग्य सहाय्यक",
@@ -452,6 +455,7 @@ const translations: Partial<Record<LanguageCode, Partial<TranslationTable>>> = {
     callStaff: "कर्मचाऱ्यांना बोलवा",
     continueQuestions: "प्रश्न सुरू ठेवा",
     possibleEmergency: "आपत्कालीन लक्षण आढळले",
+    voiceAnswerRecognized: "तुमचे उत्तर लक्षात आले",
   },
   bn: {
     guidedAssistant: "স্বাস্থ্য সহায়ক",
@@ -490,6 +494,7 @@ const translations: Partial<Record<LanguageCode, Partial<TranslationTable>>> = {
     callStaff: "কর্মীকে ডাকুন",
     continueQuestions: "প্রশ্ন চালিয়ে যান",
     possibleEmergency: "সম্ভাব্য জরুরি লক্ষণ পাওয়া গেছে",
+    voiceAnswerRecognized: "আপনার উত্তর নেওয়া হয়েছে",
   },
   ta: {
     guidedAssistant: "வழிகாட்டும் சுகாதார உதவியாளர்",
@@ -529,6 +534,7 @@ const translations: Partial<Record<LanguageCode, Partial<TranslationTable>>> = {
     callStaff: "பணியாளரை அழைக்கவும்",
     continueQuestions: "கேள்விகளைத் தொடரவும்",
     possibleEmergency: "அவசர அறிகுறி இருக்கலாம்",
+    voiceAnswerRecognized: "உங்கள் பதில் பதிவானது",
   },
   te: {
     guidedAssistant: "మార్గదర్శక ఆరోగ్య సహాయకుడు",
@@ -567,6 +573,7 @@ const translations: Partial<Record<LanguageCode, Partial<TranslationTable>>> = {
     callStaff: "సిబ్బందిని పిలవండి",
     continueQuestions: "ప్రశ్నలను కొనసాగించండి",
     possibleEmergency: "అత్యవసర లక్షణం ఉండవచ్చు",
+    voiceAnswerRecognized: "మీ సమాధానం నమోదైంది",
   },
   kn: {
     guidedAssistant: "ಮಾರ್ಗದರ್ಶಿತ ಆರೋಗ್ಯ ಸಹಾಯಕ",
@@ -605,6 +612,7 @@ const translations: Partial<Record<LanguageCode, Partial<TranslationTable>>> = {
     callStaff: "ಸಿಬ್ಬಂದಿಯನ್ನು ಕರೆಸಿ",
     continueQuestions: "ಪ್ರಶ್ನೆಗಳನ್ನು ಮುಂದುವರಿಸಿ",
     possibleEmergency: "ತುರ್ತು ಲಕ್ಷಣ ಕಂಡುಬಂದಿದೆ",
+    voiceAnswerRecognized: "ನಿಮ್ಮ ಉತ್ತರ ದಾಖಲಾಗಿದೆ",
   },
   gu: {
     guidedAssistant: "માર્ગદર્શિત આરોગ્ય સહાયક",
@@ -642,6 +650,7 @@ const translations: Partial<Record<LanguageCode, Partial<TranslationTable>>> = {
     callStaff: "સ્ટાફને બોલાવો",
     continueQuestions: "પ્રશ્નો ચાલુ રાખો",
     possibleEmergency: "આપાતકાલીન લક્ષણ મળી આવ્યું",
+    voiceAnswerRecognized: "તમારો જવાબ નોંધાયો",
   },
 };
 

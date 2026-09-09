@@ -215,6 +215,73 @@ app.post("/api/intake", async (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------
+// 4b. SAVE INTERVIEW RESPONSE
+// ---------------------------------------------------------
+
+app.post("/api/interview/response", async (req: Request, res: Response) => {
+  try {
+    const {
+      patientId,
+      questionId,
+      responseText,
+      responseType,
+    } = req.body;
+
+    if (!patientId) {
+      return res.status(400).json({
+        success: false,
+        error: "patientId is required",
+      });
+    }
+
+    if (!questionId) {
+      return res.status(400).json({
+        success: false,
+        error: "questionId is required",
+      });
+    }
+
+    if (!responseText) {
+      return res.status(400).json({
+        success: false,
+        error: "responseText is required",
+      });
+    }
+
+    const { data, error } = await supabase
+      .from("interview_responses")
+      .insert([
+        {
+          patient_id: patientId,
+          question_id: questionId,
+          response_text: responseText,
+          response_type: responseType || "voice",
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Interview response save error:", error);
+
+      return res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+
+    return res.status(201).json({ success: true, data });
+  } catch (error: any) {
+    console.error("POST /api/interview/response error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: error.message || "Failed to save interview response",
+    });
+  }
+});
+
+// ---------------------------------------------------------
 // 5. PRESCRIPTION OCR + OPTIONAL AI ANALYSIS
 // ---------------------------------------------------------
 

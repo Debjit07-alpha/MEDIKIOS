@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Mic, Loader2, Volume2, Check, Square } from "lucide-react";
-import { createRecognition, speak, stopSpeaking, transcribeAudio } from "@/lib/speech";
+import {
+  createRecognition,
+  matchVoiceToOption,
+  recognizeFreeFormVoice,
+  speak,
+  stopRecognition,
+  stopSpeaking,
+  transcribeAudio,
+} from "@/lib/speech";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/kiosk-hooks";
 
@@ -9,7 +17,7 @@ export type VoiceState = "idle" | "listening" | "processing" | "speaking" | "con
 type Props = {
   prompt: string;
   matches: { id: string; label: string }[];
-  onResolved: (optionId: string, transcript: string) => void;
+  onResolved: (optionId: string | null, transcript: string) => void;
 };
 
 export function VoiceOrb({ prompt, matches, onResolved }: Props) {
@@ -37,76 +45,53 @@ export function VoiceOrb({ prompt, matches, onResolved }: Props) {
     setTranscript("");
     setError(false);
     clearTimers();
+    stopRecognition();
     stopRecording();
     stopSpeaking();
     return () => {
       clearTimers();
+      stopRecognition();
       stopRecording();
       stopSpeaking();
     };
   }, [prompt, clearTimers, stopRecording]);
 
-  const resolve = useCallback(
-    (heard: string) => {
-      setTranscript(heard);
-      setState("processing");
-      const normalized = heard.trim().toLocaleLowerCase();
-      const hit =
-        matches.find((match) => normalized.includes(match.label.trim().toLocaleLowerCase())) ??
-        matches.find((match) =>
-          match.label
-            .toLocaleLowerCase()
-            .split(/[^a-z]+/)
-            .filter((word) => word.length > 3)
-            .some((word) => normalized.includes(word)),
-        ) ??
-        matches[0];
-
-      if (!hit) {
+  const handleResult = useCallback(
+    (optionId: string | null, heard: string) => {
+      const transcript = heard.trim();
+      if (!transcript) {
         setError(true);
         setState("idle");
         return;
       }
-
+      setTranscript(transcript);
       setState("speaking");
-      void speak(
-        `${hit.label}. ${t("continueQuestions")}.`,
-        () => {
-          setState("confirmed");
-          timers.current.push(window.setTimeout(() => onResolved(hit.id, heard), 600));
-        },
-        () => {
-          setError(true);
-          setState("idle");
-        },
-      ).catch(() => {
-        setError(true);
-        setState("idle");
-      });
+
+      const feedbackText = optionId
+        ? `${matches.find((match) => match.id === optionId)?.label ?? ""}. ${t(
+            "continueQuestions",
+          )}.`
+        : `${t("voiceGotIt")}. ${t("continueQuestions")}.`;
+
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        setState("confirmed");
+        timers.current.push(window.setTimeout(() => onResolved(optionId, transcript), 600));
+      };
+
+      // TTS is optional: it must never block the voice answer flow.
+      const cap = window.setTimeout(finish, 5000);
+      timers.current.push(cap);
+      void speak(feedbackText, finish, finish).catch(finish);
     },
     [matches, onResolved, t],
   );
 
-  const browserFallback = useCallback(() => {
-    const recognition = createRecognition();
-    if (!recognition) {
-      setError(true);
-      setState("idle");
-      return;
-    }
-    recognition.onresult = (event) => {
-      const heard = event.results[0]?.[0]?.transcript ?? "";
-      resolve(heard);
-    };
-    recognition.onerror = () => {
-      setError(true);
-      setState("idle");
-    };
-    recognition.start();
-  }, [resolve]);
-
   const start = async () => {
     if (state === "listening") {
+      stopRecognition();
       stopRecording();
       return;
     }
@@ -115,9 +100,27 @@ export function VoiceOrb({ prompt, matches, onResolved }: Props) {
     setTranscript("");
     stopSpeaking();
 
+    setState("listening");
+
+    // PRIMARY: browser SpeechRecognition (no backend required).
+    if (createRecognition()) {
+      console.info("Voice input: browser SpeechRecognition (primary)");
+      recognizeFreeFormVoice(matches)
+        .then((result) => handleResult(result.optionId, result.transcript))
+        .catch((error) => {
+          console.error("Browser speech recognition failed", error);
+          setError(true);
+          setState("idle");
+        });
+      return;
+    }
+
+    // FALLBACK: browser SpeechRecognition is unavailable, so use the
+    // MediaRecorder + backend STT path instead.
+    console.info("Voice input: browser SpeechRecognition unavailable, using backend STT");
     if (typeof MediaRecorder === "undefined" || !navigator.mediaDevices?.getUserMedia) {
-      setState("listening");
-      browserFallback();
+      setError(true);
+      setState("idle");
       return;
     }
 
@@ -147,7 +150,7 @@ export function VoiceOrb({ prompt, matches, onResolved }: Props) {
         try {
           const result = await transcribeAudio(new Blob(chunks, { type: mimeType }));
           if (!result.text) throw new Error("STT returned no transcript");
-          resolve(result.text);
+          handleResult(matchVoiceToOption(result.text, matches), result.text);
         } catch (error) {
           console.error("Speech transcription failed", error);
           setError(true);
@@ -161,7 +164,6 @@ export function VoiceOrb({ prompt, matches, onResolved }: Props) {
       console.error("Microphone permission or recording failed", error);
       setError(true);
       setState("idle");
-      browserFallback();
     }
   };
 

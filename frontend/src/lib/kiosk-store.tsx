@@ -33,6 +33,7 @@ type KioskState = {
   patient: Patient | null;
   careMode: CareMode | null;
   answers: Record<string, string[]>;
+  voiceAnswers: Record<string, string>;
   documents: ExtractedDoc[];
   redFlag: RedFlag;
   shared: boolean;
@@ -47,6 +48,7 @@ const initialState: KioskState = {
   patient: null,
   careMode: null,
   answers: {},
+  voiceAnswers: {},
   documents: [],
   redFlag: null,
   shared: false,
@@ -62,6 +64,7 @@ export type KioskContextValue = KioskState & {
   setPatient: (patient: Patient) => void;
   setCareMode: (mode: CareMode) => void;
   answer: (questionId: string, values: string[]) => void;
+  voiceAnswer: (questionId: string, transcript: string) => void;
   addDocument: (kind: DocKind) => ExtractedDoc;
   raiseRedFlag: (flag: NonNullable<RedFlag>) => void;
   clearRedFlag: () => void;
@@ -121,6 +124,11 @@ export function KioskProvider({ children }: { children: ReactNode }) {
       setCareMode: (careMode) => patch({ careMode }),
       answer: (questionId, values) =>
         setState((prev) => ({ ...prev, answers: { ...prev.answers, [questionId]: values } })),
+      voiceAnswer: (questionId, transcript) =>
+        setState((prev) => ({
+          ...prev,
+          voiceAnswers: { ...prev.voiceAnswers, [questionId]: transcript },
+        })),
       addDocument: (kind) => {
         const doc = { ...DOC_LIBRARY[kind], id: `${DOC_LIBRARY[kind].id}-${Date.now()}` };
         setState((prev) => ({ ...prev, documents: [...prev.documents, doc] }));

@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Mic } from "lucide-react";
 import { KioskShell } from "@/components/kiosk/KioskShell";
 import { ListenButton } from "@/components/kiosk/ListenButton";
 import { VoiceOrb } from "@/components/kiosk/VoiceOrb";
 import { questionsForMode, type Question } from "@/lib/kiosk-data";
 import { localizeQuestion } from "@/lib/question-i18n";
 import { useKiosk, useLanguage } from "@/lib/kiosk-hooks";
+import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/interview")({
@@ -30,7 +31,8 @@ export const Route = createFileRoute("/interview")({
 });
 
 function InterviewPage() {
-  const { careMode, answers, answer, raiseRedFlag } = useKiosk();
+  const { careMode, answers, answer, patient, voiceAnswers, voiceAnswer, raiseRedFlag } =
+    useKiosk();
   const { language, t } = useLanguage();
   const navigate = useNavigate();
   const [index, setIndex] = useState(0);
@@ -43,6 +45,7 @@ function InterviewPage() {
   const question: Question | undefined = visible[Math.min(index, visible.length - 1)];
   const localizedQuestion = question ? localizeQuestion(question, language) : undefined;
   const selected = question ? (answers[question.id] ?? []) : [];
+  const voiceAnswerText = question ? (voiceAnswers[question.id] ?? "").trim() : "";
 
   if (!question) return null;
 
@@ -68,6 +71,32 @@ function InterviewPage() {
       return;
     }
     if (!question.multi) window.setTimeout(goNext, 350);
+  };
+
+  const handleVoiceResolved = (optionId: string | null, transcript: string) => {
+    if (optionId) {
+      choose(optionId);
+      return;
+    }
+    const text = transcript.trim();
+    if (!text) return;
+    voiceAnswer(question.id, text);
+    api.interview
+      .saveResponse({
+        patientId: patient?.uhid ?? "",
+        questionId: question.id,
+        responseText: text,
+        responseType: "voice",
+      })
+      .then(() => {
+        console.info("Free-form voice answer saved to backend", { questionId: question.id });
+      })
+      .catch((error) => {
+        console.error("Failed to save free-form voice answer to backend", {
+          questionId: question.id,
+          error,
+        });
+      });
   };
 
   const goNext = () => {
@@ -115,6 +144,19 @@ function InterviewPage() {
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="grid gap-4 sm:grid-cols-2">
+          {voiceAnswerText && selected.length === 0 ? (
+            <div className="flex items-start gap-4 rounded-3xl border-2 border-primary bg-primary-soft p-5 shadow-card sm:col-span-2">
+              <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-primary text-primary-foreground">
+                <Mic className="size-7" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-lg font-bold text-primary">
+                  {t("voiceAnswerRecognized")}
+                </span>
+                <span className="block text-xl italic text-foreground">“{voiceAnswerText}”</span>
+              </span>
+            </div>
+          ) : null}
           {localizedQuestion?.options.map((o) => {
             const on = selected.includes(o.id);
             return (
@@ -147,7 +189,7 @@ function InterviewPage() {
           key={question.id}
           prompt={question.prompt}
           matches={localizedQuestion?.options.map((o) => ({ id: o.id, label: o.label })) ?? []}
-          onResolved={(optionId) => choose(optionId)}
+          onResolved={handleVoiceResolved}
         />
       </div>
 
@@ -162,7 +204,7 @@ function InterviewPage() {
         <button
           type="button"
           onClick={goNext}
-          disabled={selected.length === 0}
+          disabled={selected.length === 0 && voiceAnswerText === ""}
           className="inline-flex min-h-20 items-center gap-3 rounded-full bg-primary px-12 text-2xl font-extrabold text-primary-foreground shadow-lift transition-opacity disabled:opacity-40"
         >
           {index + 1 >= visible.length ? t("finishQuestions") : t("next")}{" "}

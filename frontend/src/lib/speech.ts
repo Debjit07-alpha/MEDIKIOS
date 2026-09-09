@@ -8,6 +8,8 @@ let activeAudio: HTMLAudioElement | null = null;
 let activeObjectUrl: string | null = null;
 let activeRequest: AbortController | null = null;
 let speechGeneration = 0;
+let activeRecognition: RecognitionLike | null = null;
+let recognitionGeneration = 0;
 
 export type TranscriptionResult = {
   success: boolean;
@@ -166,4 +168,137 @@ export function createRecognition(): RecognitionLike | null {
   recognition.interimResults = false;
   recognition.continuous = false;
   return recognition;
+}
+
+// ---------------------------------------------------------------------------
+// Free-form voice answers
+// ---------------------------------------------------------------------------
+
+export type VoiceMatchOption = {
+  id: string;
+  label: string;
+};
+
+export type FreeFormVoiceResult = {
+  transcript: string;
+  optionId: string | null;
+};
+
+export function normalizeSpeechText(text: string): string {
+  return text.trim().replace(/\s+/g, " ").toLocaleLowerCase(getSpeechLocale());
+}
+
+/**
+ * Match a spoken transcript against predefined answer options.
+ * Returns the option id when a confident match exists, otherwise null.
+ * It NEVER falls back to the first option: an unknown patient complaint
+ * remains a free-form answer.
+ */
+export function matchVoiceToOption(transcript: string, options: VoiceMatchOption[]): string | null {
+  const normalized = normalizeSpeechText(transcript);
+  if (!normalized) return null;
+
+  let best: string | null = null;
+  let bestScore = 0;
+  for (const option of options) {
+    const label = normalizeSpeechText(option.label);
+    if (!label) continue;
+    // Full phrase containment is the strongest signal.
+    if (normalized.includes(label)) return option.id;
+    // Otherwise require at least two significant option words to be present.
+    const words = label.split(/[^a-z0-9]+/).filter((word) => word.length > 3);
+    if (words.length === 0) continue;
+    const score = words.filter((word) => normalized.includes(word)).length;
+    if (score > bestScore) {
+      bestScore = score;
+      best = option.id;
+    }
+  }
+  return bestScore >= 2 ? best : null;
+}
+
+/**
+ * Capture speech through the browser's SpeechRecognition API and match it
+ * against the provided answer options. Uses the currently selected speech
+ * language. Unmatched speech is preserved as a free-form transcript with
+ * optionId = null. Works entirely in the browser: the backend is not required.
+ */
+export function recognizeFreeFormVoice(
+  options: VoiceMatchOption[],
+  timeoutMs = 8000,
+): Promise<FreeFormVoiceResult> {
+  return new Promise((resolve, reject) => {
+    const recognition = createRecognition();
+    if (!recognition) {
+      reject(new Error("Speech recognition is not supported in this browser"));
+      return;
+    }
+    const generation = recognitionGeneration + 1;
+    recognitionGeneration = generation;
+    activeRecognition = recognition;
+
+    let settled = false;
+    const cleanup = () => {
+      window.clearTimeout(timer);
+      if (activeRecognition === recognition) activeRecognition = null;
+    };
+    const finish = (transcript: string) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve({
+        transcript,
+        optionId: matchVoiceToOption(transcript, options),
+      });
+    };
+    const fail = (message: string) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error(message));
+    };
+
+    const timer = window.setTimeout(() => {
+      if (settled) return;
+      try {
+        recognition.stop();
+      } catch {
+        /* ignore */
+      }
+      fail("No speech detected");
+    }, timeoutMs);
+
+    recognition.onresult = (event) => {
+      const heard = event.results[0]?.[0]?.transcript ?? "";
+      finish(heard.trim());
+    };
+    recognition.onerror = () => {
+      if (settled) return;
+      fail("Speech recognition failed");
+    };
+    recognition.onend = () => {
+      if (settled) return;
+      if (generation !== recognitionGeneration) {
+        fail("Speech recognition stopped");
+        return;
+      }
+      fail("No speech detected");
+    };
+    recognition.start();
+  });
+}
+
+/**
+ * Stop the currently active browser speech recognition, if any.
+ * A recognition stopped this way rejects instead of resolving, so a stale
+ * answer is never applied after the user cancels or navigates away.
+ */
+export function stopRecognition() {
+  recognitionGeneration += 1;
+  try {
+    activeRecognition?.stop();
+  } catch {
+    /* ignore */
+  }
+  activeRecognition = null;
 }
