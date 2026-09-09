@@ -74,9 +74,12 @@ function InterviewPage() {
     answer(question.id, next);
 
     if (option?.redFlag) {
+      const localizedOption = localizedQuestion?.options.find((o) => o.id === option.id);
       raiseRedFlag({
         label: t("possibleEmergency"),
-        detail: `${question.prompt} — patient answered “${option.label}”.`,
+        detail: t("redFlagDetail")
+          .replace("{question}", localizedQuestion?.prompt ?? question.prompt)
+          .replace("{answer}", localizedOption?.label ?? option.label),
         at: new Date().toISOString(),
       });
       return;
@@ -198,7 +201,7 @@ function InterviewPage() {
 
         <VoiceOrb
           key={question.id}
-          prompt={question.prompt}
+          prompt={localizedQuestion?.prompt ?? question.prompt}
           matches={localizedQuestion?.options.map((o) => ({ id: o.id, label: o.label })) ?? []}
           onResolved={handleVoiceResolved}
         />

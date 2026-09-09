@@ -1,8 +1,25 @@
+import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { CheckCircle2, Printer, DoorOpen } from "lucide-react";
+import { CheckCircle2, Printer, DoorOpen, Loader2 } from "lucide-react";
 import { KioskShell } from "@/components/kiosk/KioskShell";
 import { ListenButton } from "@/components/kiosk/ListenButton";
+import { DoctorSummaryView } from "@/components/kiosk/DoctorSummaryView";
 import { useKiosk, useLanguage } from "@/lib/kiosk-hooks";
+import { api } from "@/lib/api";
+
+type DoctorSummaryContent = {
+  patientLanguage?: string;
+  careMode?: string;
+  patient?: {
+    name: string;
+    age: number;
+    sex: string;
+    uhid: string;
+  } | null;
+  sections: { title: string; items: { label: string; value: string; verbatim?: boolean }[] }[];
+  text?: string;
+  generatedBy?: string;
+};
 
 export const Route = createFileRoute("/done")({
   head: () => ({
@@ -24,10 +41,40 @@ export const Route = createFileRoute("/done")({
 });
 
 function DonePage() {
-  const { patient, shared, reset } = useKiosk();
-  const { t } = useLanguage();
+  const { patient, shared, summaryConfirmed, reset } = useKiosk();
+  const { language, t } = useLanguage();
   const navigate = useNavigate();
   const message = `${t("doneThankYou")} ${patient?.name.split(" ")[0] ?? ""}. ${t("doneMessage")}`;
+
+  const [doctorSummary, setDoctorSummary] = useState<DoctorSummaryContent | null>(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [summaryError, setSummaryError] = useState(false);
+
+  useEffect(() => {
+    if (!summaryConfirmed || !patient?.uhid) return;
+
+    let cancelled = false;
+
+    const fetchSummary = async () => {
+      setLoadingSummary(true);
+      try {
+        const result = await api.summary.getDoctor(patient.uhid);
+        if (!cancelled && result.success && result.doctorSummary?.content) {
+          setDoctorSummary(result.doctorSummary.content as DoctorSummaryContent);
+        }
+      } catch (err) {
+        console.warn("Failed to fetch doctor summary:", err);
+        if (!cancelled) setSummaryError(true);
+      } finally {
+        if (!cancelled) setLoadingSummary(false);
+      }
+    };
+
+    fetchSummary();
+    return () => {
+      cancelled = true;
+    };
+  }, [summaryConfirmed, patient?.uhid]);
 
   return (
     <KioskShell showSteps={false}>
@@ -63,6 +110,29 @@ function DonePage() {
           </button>
         </div>
       </div>
+
+      {shared && (
+        <div className="mx-auto mt-8 max-w-4xl">
+          {loadingSummary ? (
+            <div className="flex flex-col items-center gap-4 rounded-4xl border-2 border-primary bg-primary-soft p-10 shadow-card">
+              <Loader2 className="size-10 animate-spin text-primary" />
+              <p className="text-xl font-bold">
+                {language === "en"
+                  ? "Loading doctor summary..."
+                  : t("loadingDoctorSummary")}
+              </p>
+            </div>
+          ) : doctorSummary ? (
+            <DoctorSummaryView summary={doctorSummary} />
+          ) : summaryError ? (
+            <div className="rounded-3xl border border-border bg-card p-6 text-center shadow-card">
+              <p className="text-lg text-muted-foreground">
+                Doctor summary will be available shortly.
+              </p>
+            </div>
+          ) : null}
+        </div>
+      )}
     </KioskShell>
   );
 }

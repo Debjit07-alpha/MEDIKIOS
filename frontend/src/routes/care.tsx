@@ -27,37 +27,9 @@ export const Route = createFileRoute("/care")({
 const CARDS: {
   mode: CareMode;
   icon: typeof Stethoscope;
-  title: string;
-  native: string;
-  sub: string;
-  points: string[];
 }[] = [
-  {
-    mode: "allopathy",
-    icon: Stethoscope,
-    title: "Modern medicine",
-    native: "एलोपैथी",
-    sub: "OPD doctor, tests and tablets",
-    points: [
-      "Your main problem",
-      "Old illness and operations",
-      "Medicines and allergy",
-      "Family and habits",
-    ],
-  },
-  {
-    mode: "ayush",
-    icon: Leaf,
-    title: "AYUSH care",
-    native: "आयुष",
-    sub: "Ayurveda, Yoga, Unani, Siddha, Homoeopathy",
-    points: [
-      "Your body nature",
-      "Digestion and strength",
-      "Sleep, mind and habits",
-      "How the problem grew",
-    ],
-  },
+  { mode: "allopathy", icon: Stethoscope },
+  { mode: "ayush", icon: Leaf },
 ];
 
 function CarePage() {
@@ -75,9 +47,25 @@ function CarePage() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         {CARDS.map((c) => {
-          const title = c.mode === "ayush" ? t("ayushCare") : t("modernMedicine");
-          const sub = c.mode === "ayush" ? t("ayushCareSub") : t("modernMedicineSub");
           const ayush = c.mode === "ayush";
+          const title = ayush ? t("ayushCare") : t("modernMedicine");
+          const sub = ayush ? t("ayushCareSub") : t("modernMedicineSub");
+          const native = ayush ? t("careAyushNative") : t("careAllopathyNative");
+          const points = [
+            ...(ayush
+              ? [
+                  t("careAyushPoint1"),
+                  t("careAyushPoint2"),
+                  t("careAyushPoint3"),
+                  t("careAyushPoint4"),
+                ]
+              : [
+                  t("careModernPoint1"),
+                  t("careModernPoint2"),
+                  t("careModernPoint3"),
+                  t("careModernPoint4"),
+                ]),
+          ];
           return (
             <div
               key={c.mode}
@@ -96,11 +84,11 @@ function CarePage() {
               </span>
               <h2 className="mt-6 text-4xl">{title}</h2>
               <p className={cn("text-3xl font-extrabold", ayush ? "text-ayush" : "text-primary")}>
-                {c.native}
+                {native}
               </p>
               <p className="mt-3 text-xl text-muted-foreground">{sub}</p>
               <ul className="mt-5 flex-1 space-y-3">
-                {c.points.map((p) => (
+                {points.map((p) => (
                   <li key={p} className="flex items-center gap-3 text-xl">
                     <span
                       className={cn(

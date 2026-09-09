@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ArrowRight, AlertTriangle } from "lucide-react";
 import { KioskShell, PageHeading } from "@/components/kiosk/KioskShell";
-import { ClinicalSummary, buildSummary, type SummaryRow } from "@/components/kiosk/ClinicalSummary";
+import { ClinicalSummary } from "@/components/kiosk/ClinicalSummary";
+import { buildSummary, type SummaryRow } from "@/lib/buildSummary";
 import { useKiosk, useLanguage } from "@/lib/kiosk-hooks";
 import { translate } from "@/lib/i18n";
 

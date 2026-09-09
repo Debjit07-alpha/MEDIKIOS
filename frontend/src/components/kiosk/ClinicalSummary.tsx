@@ -1,36 +1,13 @@
 import { useState } from "react";
 import { Pencil, Check, X, Save } from "lucide-react";
-import { questionsForMode, type CareMode, type ExtractedDoc } from "@/lib/kiosk-data";
+import { type CareMode, type ExtractedDoc } from "@/lib/kiosk-data";
 import { DocumentCard } from "./DocumentCard";
 import { ListenButton } from "./ListenButton";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/kiosk-hooks";
-import { localizeQuestion } from "@/lib/question-i18n";
+import type { SummaryRow } from "@/lib/buildSummary";
 
-export type SummaryRow = {
-  section: string;
-  field: string;
-  label: string;
-  value: string;
-};
-
-export function buildSummary(
-  mode: CareMode,
-  answers: Record<string, string[]>,
-  fallback = "Not answered",
-  language: import("@/lib/kiosk-data").LanguageCode = "en",
-): SummaryRow[] {
-  return questionsForMode(mode)
-    .filter((q) => (q.showIf ? q.showIf(answers) : true))
-    .map((q) => {
-      const picked = answers[q.id] ?? [];
-      const localized = localizeQuestion(q, language);
-      const value = picked.length
-        ? picked.map((id) => localized.options.find((o) => o.id === id)?.label ?? id).join(", ")
-        : fallback;
-      return { section: localized.section, field: q.field, label: localized.fieldLabel, value };
-    });
-}
+export type { SummaryRow } from "@/lib/buildSummary";
 
 export function ClinicalSummary({
   mode,
@@ -60,11 +37,9 @@ export function ClinicalSummary({
     <div className="grid gap-6">
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 rounded-3xl border border-border bg-card p-5 shadow-card">
         <p className="min-w-0 text-xl font-bold">
-          {mode === "ayush"
-            ? "AYUSH extended assessment (Dashavidha Pariksha)"
-            : "Standard clinical history (Allopathy)"}
+          {mode === "ayush" ? t("summaryModeAyush") : t("summaryModeAllopathy")}
         </p>
-        <ListenButton text={spoken} label="Read summary" />
+        <ListenButton text={spoken} label={t("summaryRead")} />
       </div>
 
       {Object.entries(sections).map(([section, items]) => (
@@ -108,7 +83,7 @@ export function ClinicalSummary({
                       <div className="flex gap-2">
                         <button
                           type="button"
-                          aria-label="Save field"
+                          aria-label={t("summarySaveField")}
                           onClick={() => {
                             onChange?.(
                               rows.map((r) =>
@@ -123,7 +98,7 @@ export function ClinicalSummary({
                         </button>
                         <button
                           type="button"
-                          aria-label="Cancel edit"
+                          aria-label={t("summaryCancelEdit")}
                           onClick={() => setEditing(null)}
                           className="grid size-11 place-items-center rounded-full border border-border"
                         >
@@ -133,7 +108,7 @@ export function ClinicalSummary({
                     ) : (
                       <button
                         type="button"
-                        aria-label={`Edit ${row.label}`}
+                        aria-label={`${t("summaryEdit")} ${row.label}`}
                         onClick={() => {
                           setEditing(row.field + row.label);
                           setDraft(row.value === t("notAnswered") ? "" : row.value);
@@ -155,7 +130,7 @@ export function ClinicalSummary({
 
       {documents.length ? (
         <section className="grid gap-4">
-          <h3 className="text-2xl font-extrabold">Documents digitised this visit</h3>
+          <h3 className="text-2xl font-extrabold">{t("summaryDocsTitle")}</h3>
           {documents.map((d) => (
             <DocumentCard key={d.id} doc={d} compact />
           ))}

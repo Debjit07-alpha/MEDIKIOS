@@ -262,4 +262,39 @@ export const api = {
     patients: () => request<Patient[]>("/api/staff/patients"),
     patient: (id: string) => request<Patient>(`/api/staff/patients/${id}`),
   },
+
+  summary: {
+    generateDoctor: (body: {
+      patientId: string;
+      patientLanguage: string;
+      careMode: string;
+      patient: { name: string; age: number; sex: string; uhid: string } | null;
+      answers: Record<string, string[]>;
+      voiceAnswers: Record<string, string>;
+      documents: unknown[];
+      redFlag: { label: string; detail: string; at: string } | null;
+      doctorSummaryRows: { qid?: string; section: string; field: string; label: string; value: string }[];
+      patientSummaryRows: { section: string; field: string; label: string; value: string }[];
+      shareScope: "abha" | "hospital";
+    }) =>
+      request<{
+        success: boolean;
+        patientId: string;
+        patientLanguage: string;
+        patientSummary: { language: string; content: unknown[] };
+        doctorSummary: { language: string; content: unknown };
+      }>("/api/summary/doctor", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+
+    getDoctor: (patientId: string) =>
+      request<{
+        success: boolean;
+        patientId: string;
+        patientLanguage: string;
+        patientSummary: { language: string; content: unknown[] };
+        doctorSummary: { language: string; content: unknown };
+      }>(`/api/summary/doctor/${patientId}`),
+  },
 };

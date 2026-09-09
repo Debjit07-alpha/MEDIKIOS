@@ -33,14 +33,11 @@ export function RedFlagOverlay() {
             <p className="text-sm font-bold uppercase tracking-widest text-destructive">
               {t("possibleEmergency")}
             </p>
-            <h2 className="text-4xl text-destructive">Please wait here</h2>
+            <h2 className="text-4xl text-destructive">{t("redFlagPleaseWait")}</h2>
           </div>
         </div>
 
-        <p className="mt-6 text-2xl font-semibold leading-snug">
-          Your answer shows a sign that a doctor must see immediately. The questions have been
-          stopped.
-        </p>
+        <p className="mt-6 text-2xl font-semibold leading-snug">{t("redFlagBody")}</p>
         <div className="mt-4 rounded-3xl border-2 border-destructive/30 bg-destructive-soft p-5">
           <p className="text-lg font-bold text-destructive">{redFlag.label}</p>
           <p className="mt-1 text-lg text-foreground">{redFlag.detail}</p>

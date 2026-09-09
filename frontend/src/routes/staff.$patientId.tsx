@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { ArrowLeft, AlertTriangle, CheckCircle2, XCircle, Stethoscope, Leaf } from "lucide-react";
-import { ClinicalSummary, buildSummary, type SummaryRow } from "@/components/kiosk/ClinicalSummary";
+import { ClinicalSummary } from "@/components/kiosk/ClinicalSummary";
+import { buildSummary, type SummaryRow } from "@/lib/buildSummary";
 import { DOC_LIBRARY, QUEUE, type CareMode } from "@/lib/kiosk-data";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";

@@ -62,7 +62,7 @@ function DashboardPage() {
   return (
     <KioskShell step="start">
       <PageHeading
-        title={`Namaste ${firstName}`}
+        title={`${t("greetingNamaste")} ${firstName}`}
         subtitle={t("careSubtitle")}
         listenText={`${t("stepQuestions")}. ${t("papersTitle")}`}
       />
@@ -71,8 +71,7 @@ function DashboardPage() {
         <div className="flex min-w-0 items-center gap-3">
           <ShieldCheck className="size-8 shrink-0 text-primary" />
           <p className="truncate text-xl font-bold">
-            {t("careTitle")}:{" "}
-            {careMode === "ayush" ? "AYUSH (Ayurveda and allied)" : "Modern medicine (Allopathy)"}
+            {t("careTitle")}: {careMode === "ayush" ? t("careModeAyush") : t("careModeAllopathy")}
           </p>
         </div>
         <button

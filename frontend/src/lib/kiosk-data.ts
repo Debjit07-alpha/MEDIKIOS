@@ -438,6 +438,31 @@ export const QUESTIONS: Question[] = [
 export const questionsForMode = (mode: CareMode) =>
   QUESTIONS.filter((q) => q.mode === "both" || q.mode === mode);
 
+/**
+ * Every question that can appear in the AYUSH treatment history flow, in the
+ * order they are asked. Note `chest_alarm` and `general_alarm` are mutually
+ * exclusive (driven by `showIf`), so a single visit sees at most 16 of the 17.
+ */
+export const AYUSH_FLOW_QUESTION_IDS = [
+  "chief_complaint",
+  "onset",
+  "severity",
+  "chest_alarm",
+  "general_alarm",
+  "prakriti",
+  "vikriti",
+  "sara",
+  "samhanana",
+  "pramana",
+  "satmya",
+  "sattva",
+  "ahara_shakti",
+  "vyayama_shakti",
+  "vaya",
+  "nidana",
+  "samprapti",
+] as const;
+
 /* ---------------- Documents ---------------- */
 
 export type DocKind = "prescription" | "lab" | "discharge";

@@ -10,6 +10,15 @@ import voiceRouter from "./routes/voice";
 import ocrRouter from "./routes/ocr";
 import { supabase } from "./database/supabase";
 import { assertOcrApiKey, ocrImage, ocrHttpResponse } from "./services/ocr";
+import {
+  DOCTOR_SUMMARY_QUESTION_ID,
+  DOCTOR_SUMMARY_RESPONSE_TYPE,
+  PATIENT_SUMMARY_QUESTION_ID,
+  PATIENT_SUMMARY_RESPONSE_TYPE,
+  generateDoctorEnglishSummary,
+  enhanceWithAi,
+  type PatientDoctorSummaryPayload,
+} from "./services/doctorSummary";
 
 const app = express();
 
@@ -275,6 +284,157 @@ app.post("/api/interview/response", async (req: Request, res: Response) => {
       success: false,
       error: error.message || "Failed to save interview response",
     });
+  }
+});
+
+// ---------------------------------------------------------
+// 4c. GENERATE + STORE DOCTOR SUMMARY (always English)
+// ---------------------------------------------------------
+
+app.post("/api/summary/doctor", async (req: Request, res: Response) => {
+  try {
+    const body = req.body || {};
+
+    const patientId = body.patientId;
+    if (!patientId) {
+      return res.status(400).json({
+        success: false,
+        error: "patientId is required",
+      });
+    }
+
+    const payload: PatientDoctorSummaryPayload = {
+      patientId,
+      patientLanguage: body.patientLanguage || "en",
+      careMode: body.careMode === "ayush" ? "ayush" : "allopathy",
+      patient: body.patient || null,
+      answers: body.answers || {},
+      voiceAnswers: body.voiceAnswers || {},
+      documents: Array.isArray(body.documents) ? body.documents : [],
+      redFlag: body.redFlag || null,
+      doctorSummaryRows: Array.isArray(body.doctorSummaryRows) ? body.doctorSummaryRows : [],
+      shareScope: body.shareScope === "abha" ? "abha" : "hospital",
+    };
+
+    // The doctor summary language is enforced here, server-side, and is never
+    // derived from the patient's selected language.
+    const englishSummary = generateDoctorEnglishSummary(payload);
+    const finalSummary = openai
+      ? await enhanceWithAi(payload, openai as any)
+      : englishSummary;
+
+    const doctorSummary = {
+      language: "en" as const,
+      content: finalSummary,
+    };
+
+    const patientSummary = {
+      language: payload.patientLanguage,
+      content: Array.isArray(body.patientSummaryRows) ? body.patientSummaryRows : [],
+    };
+
+    // Persist BOTH representations as additional derived rows in the existing
+    // interview_responses table. Original patient responses are never touched.
+    const { error: doctorError } = await supabase
+      .from("interview_responses")
+      .insert([
+        {
+          patient_id: patientId,
+          question_id: PATIENT_SUMMARY_QUESTION_ID,
+          response_text: JSON.stringify({ language: payload.patientLanguage, content: patientSummary.content }),
+          response_type: PATIENT_SUMMARY_RESPONSE_TYPE,
+        },
+        {
+          patient_id: patientId,
+          question_id: DOCTOR_SUMMARY_QUESTION_ID,
+          response_text: JSON.stringify(doctorSummary.content),
+          response_type: DOCTOR_SUMMARY_RESPONSE_TYPE,
+        },
+      ]);
+
+    if (doctorError) {
+      console.error("Doctor summary storage error:", doctorError.message);
+      return res.status(500).json({
+        success: false,
+        error: doctorError.message || "Failed to store summary",
+        doctorSummary,
+      });
+    }
+
+    return res.status(201).json({
+      success: true,
+      patientId,
+      patientLanguage: payload.patientLanguage,
+      patientSummary,
+      doctorSummary,
+    });
+  } catch (error: any) {
+    console.error("POST /api/summary/doctor error:", error?.message || error);
+    return res.status(500).json({
+      success: false,
+      error: error?.message || "Failed to generate doctor summary",
+    });
+  }
+});
+
+// Retrieve the latest stored doctor (English) + patient (localised) summaries.
+app.get("/api/summary/doctor/:patientId", async (req: Request, res: Response) => {
+  try {
+    const { patientId } = req.params;
+    const { data, error } = await supabase
+      .from("interview_responses")
+      .select("*")
+      .eq("patient_id", patientId)
+      .in("question_id", [DOCTOR_SUMMARY_QUESTION_ID, PATIENT_SUMMARY_QUESTION_ID])
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Doctor summary fetch error:", error.message);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    const doctorRow = (data || []).find((r) => r.question_id === DOCTOR_SUMMARY_QUESTION_ID);
+    const patientRow = (data || []).find((r) => r.question_id === PATIENT_SUMMARY_QUESTION_ID);
+
+    if (!doctorRow) {
+      return res.status(404).json({
+        success: false,
+        error: "No shared summary found for this patient",
+      });
+    }
+
+    let content: any = doctorRow.response_text;
+    try {
+      content = JSON.parse(doctorRow.response_text);
+    } catch {
+      content = { text: content };
+    }
+
+    let patientContent: any = null;
+    if (patientRow) {
+      try {
+        patientContent = JSON.parse(patientRow.response_text);
+      } catch {
+        patientContent = { language: "en", content: [] };
+      }
+    }
+
+    return res.json({
+      success: true,
+      patientId,
+      patientLanguage: content?.patientLanguage || "en",
+      patientSummary: {
+        language: patientContent?.language || "en",
+        content: patientContent?.content ?? [],
+      },
+      doctorSummary: {
+        language: "en",
+        content,
+      },
+    });
+  } catch (error: any) {
+    console.error("GET /api/summary/doctor/:patientId error:", error?.message || error);
+    return res.status(500).json({ success: false, error: error?.message || "Failed to fetch summary" });
   }
 });
 
