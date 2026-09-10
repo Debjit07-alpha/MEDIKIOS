@@ -90,6 +90,7 @@ export interface IntakeData {
 export interface InterviewResponseInput {
   patientId: string;
   sessionId?: string | null;
+  careMode?: string | null;
   questionId: string;
   responseText: string;
   responseType: string;
@@ -312,7 +313,7 @@ export const api = {
   },
 
   interview: {
-    ensureSession: (body: { patientId: string; careMode?: string | null }) =>
+    ensureSession: (body: { patientId: string; careMode: string }) =>
       request<{ success: boolean; reused: boolean; data: { id: string } }>(
         "/api/interview/session",
         {

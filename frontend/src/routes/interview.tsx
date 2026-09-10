@@ -113,7 +113,14 @@ function InterviewPage() {
   const persistAnswer = (questionId: string, responseText: string, responseType: string) => {
     if (!patientId) return;
     api.interview
-      .saveResponse({ patientId, sessionId, questionId, responseText, responseType })
+      .saveResponse({
+        patientId,
+        sessionId,
+        careMode: careMode ?? "allopathy",
+        questionId,
+        responseText,
+        responseType,
+      })
       .then((res) => {
         // Backend reuses the open session; adopt the id it confirms.
         if (res?.sessionId && res.sessionId !== sessionId) setSessionId(res.sessionId);

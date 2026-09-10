@@ -17,6 +17,10 @@ import {
   enhanceWithAi,
   type PatientDoctorSummaryPayload,
 } from "./services/doctorSummary";
+import {
+  findBankQuestion,
+  questionsForMode,
+} from "./services/interviewQuestions";
 
 const app = express();
 
@@ -58,12 +62,14 @@ async function patientExists(patientId: string): Promise<boolean> {
 }
 
 /** Find the open interview session for a patient, if any. */
-async function openSessionFor(patientId: string) {
-  const { data, error } = await supabase
+async function openSessionFor(patientId: string, careMode?: string | null) {
+  let query = supabase
     .from("interview_sessions")
     .select("*")
     .eq("patient_id", patientId)
-    .eq("status", "in_progress")
+    .eq("status", "active");
+  if (careMode) query = query.eq("care_mode", careMode);
+  const { data, error } = await query
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -71,11 +77,94 @@ async function openSessionFor(patientId: string) {
   return data;
 }
 
+/**
+ * interview_sessions schema (source of truth — DO NOT alter the table):
+ *   care_mode text NOT NULL, only "allopathy" | "ayush"
+ *   status text NOT NULL default "active", only "active" | "completed" | "cancelled"
+ */
+function normalizeCareMode(value: unknown): "allopathy" | "ayush" | null {
+  if (typeof value !== "string") return null;
+  const v = value.trim().toLowerCase();
+  if (v === "ayush") return "ayush";
+  if (v === "allopathy") return "allopathy";
+  return null;
+}
+
 /** Preserve Supabase error codes while adding an actionable message. */
 function dbError(error: any, action: string): Error {
   const err = new Error(writeErrorMessage(error, action));
   (err as any).code = error?.code;
   return err;
+}
+
+/**
+ * Seed the per-session question rows.
+ * interview_responses carries a composite FK
+ * (session_id, question_key) → interview_questions(session_id, question_key),
+ * so the question set must exist before any answer is saved.
+ * Missing keys are inserted; existing rows are never touched.
+ */
+async function seedSessionQuestions(
+  sessionId: string,
+  mode: "allopathy" | "ayush",
+): Promise<void> {
+  const bank = questionsForMode(mode);
+  const { data: existing, error: readError } = await supabase
+    .from("interview_questions")
+    .select("question_key")
+    .eq("session_id", sessionId);
+  if (readError) throw dbError(readError, "Reading the session questions");
+  const known = new Set((existing || []).map((r: any) => r.question_key));
+  const missing = bank.filter((q) => !known.has(q.key));
+  if (missing.length === 0) return;
+  const { error: insertError } = await supabase
+    .from("interview_questions")
+    .insert(
+      missing.map((q) => ({
+        session_id: sessionId,
+        question_key: q.key,
+        question_text: q.text,
+        question_order: q.order,
+      }))
+    );
+  if (insertError) throw dbError(insertError, "Seeding the session questions");
+}
+
+/**
+ * Guarantee a single question row exists for this session (e.g. a newer
+ * kiosk build asks a key the session was not seeded with, or a free-form
+ * voice answer arrives under a fresh key). Never duplicates.
+ */
+async function ensureSessionQuestion(
+  sessionId: string,
+  mode: "allopathy" | "ayush",
+  questionKey: string,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from("interview_questions")
+    .select("id")
+    .eq("session_id", sessionId)
+    .eq("question_key", questionKey)
+    .maybeSingle();
+  if (error) throw dbError(error, "Reading the session question");
+  if (data?.id) return;
+  const bankEntry = findBankQuestion(mode, questionKey);
+  const { error: insertError } = await supabase
+    .from("interview_questions")
+    .insert([
+      {
+        session_id: sessionId,
+        question_key: questionKey,
+        question_text: bankEntry ? bankEntry.text : questionKey,
+        question_order: bankEntry ? bankEntry.order : 999,
+      },
+    ]);
+  if (insertError) throw dbError(insertError, "Adding the session question");
+}
+
+/** Care mode stored on a session row ("allopathy" | "ayush"). */
+function sessionMode(session: any): "allopathy" | "ayush" {
+  return session?.care_mode === "ayush" ? "ayush" : "allopathy";
 }
 
 // ---------------------------------------------------------
@@ -449,15 +538,16 @@ app.post("/api/intake", async (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------
-// 4b. INTERVIEW SESSION (ONE session per kiosk visit).
-// Create once when Questions starts; reuse while in_progress.
+// 4b. INTERVIEW SESSION (ONE active session per patient + care mode).
+// Created once when Questions starts; reused on every render, question
+// change and answer. Status "active" matches the DB check constraint.
 // ---------------------------------------------------------
 
 app.post("/api/interview/session", async (req: Request, res: Response) => {
   try {
     const { patientId, patient_id, careMode, care_mode } = req.body || {};
     const pid = patientId || patient_id;
-    const mode = careMode || care_mode || null;
+    const mode = normalizeCareMode(careMode || care_mode);
 
     if (!isUuid(pid)) {
       return res.status(400).json({
@@ -466,24 +556,42 @@ app.post("/api/interview/session", async (req: Request, res: Response) => {
       });
     }
 
+    if (!mode) {
+      return res.status(400).json({
+        success: false,
+        error: 'careMode is required ("allopathy" or "ayush")',
+      });
+    }
+
     if (!(await patientExists(pid))) {
       return res.status(404).json({ success: false, error: "Patient not found" });
     }
 
-    const existing = await openSessionFor(pid);
+    const existing = await openSessionFor(pid, mode);
     if (existing) {
+      await seedSessionQuestions(existing.id, mode);
       return res.json({ success: true, data: existing, reused: true });
     }
 
     const { data, error } = await supabase
       .from("interview_sessions")
-      .insert([{ patient_id: pid, status: "in_progress", care_mode: mode }])
+      .insert([{ patient_id: pid, status: "active", care_mode: mode }])
       .select()
       .single();
 
     if (error) {
       console.error("Interview session creation error:", error);
       return res.status(400).json({ success: false, error: error.message });
+    }
+
+    try {
+      await seedSessionQuestions(data.id, mode);
+    } catch (seedError: any) {
+      console.error("Interview question seeding error:", seedError?.message || seedError);
+      return res.status(500).json({
+        success: false,
+        error: seedError?.message || "Failed to prepare the interview questions",
+      });
     }
 
     return res.status(201).json({ success: true, data, reused: false });
@@ -574,8 +682,9 @@ app.post("/api/interview/response", async (req: Request, res: Response) => {
     }
 
     // Resolve the session: explicit sessionId wins (must belong to the
-    // patient), otherwise reuse the open session, otherwise create one.
-    // NEVER one session per question or per route transition.
+    // patient), otherwise reuse the patient's active session.
+    // NEVER create an incomplete session (care_mode is NOT NULL) and NEVER
+    // one session per question or per route transition.
     let session: any = null;
     const sid = sessionId || session_id;
     if (isUuid(sid)) {
@@ -595,13 +704,26 @@ app.post("/api/interview/response", async (req: Request, res: Response) => {
     } else {
       session = await openSessionFor(pid);
       if (!session) {
+        // Only auto-create when the caller supplies a valid care mode
+        // (e.g. an answer tapped before the session-ensure round-trip
+        // finished). Otherwise refuse instead of inserting an invalid row.
+        const fallbackMode = normalizeCareMode(
+          (req.body || {}).careMode || (req.body || {}).care_mode
+        );
+        if (!fallbackMode) {
+          return res.status(400).json({
+            success: false,
+            error: "No active interview session. Start the interview first.",
+          });
+        }
         const { data, error } = await supabase
           .from("interview_sessions")
-          .insert([{ patient_id: pid, status: "in_progress" }])
+          .insert([{ patient_id: pid, status: "active", care_mode: fallbackMode }])
           .select()
           .single();
         if (error) throw dbError(error, "Creating the interview session");
         session = data;
+        await seedSessionQuestions(session.id, fallbackMode);
       }
     }
 
@@ -609,6 +731,10 @@ app.post("/api/interview/response", async (req: Request, res: Response) => {
     // the frontend sent. The schema has no response_type column, so the
     // frontend-provided text is authoritative in both cases.
     const storedAnswer = answerText;
+
+    // The (session_id, question_key) FK requires the question row:
+    // backfill it when the session predates seeding or the key is new.
+    await ensureSessionQuestion(session.id, sessionMode(session), qkey);
 
     const { data: existing } = await supabase
       .from("interview_responses")

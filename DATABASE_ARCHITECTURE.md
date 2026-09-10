@@ -36,16 +36,18 @@ Readers: `GET /api/patients/:id`, `POST /api/patients/identify`,
 `GET /api/staff/patients`, `GET /api/staff/patients/:id`.
 
 ### `interview_sessions` — CORE
-One row per kiosk visit (`status='in_progress'` while active).
-Created once by `POST /api/interview/session` (reuses the open session),
-closed by `POST /api/interview/session/:id/complete`.
+One ACTIVE row per patient + care mode (`status='active'` while the visit
+is open; check constraint allows `active` | `completed` | `cancelled`).
+Created once by `POST /api/interview/session` (reuses the active session
+for the same patient + care mode), closed by
+`POST /api/interview/session/:id/complete` (`status='completed'`).
 
 | column | type |
 |---|---|
 | id | uuid PK |
 | patient_id | uuid → `patients.id` |
-| status | text (`in_progress` / `completed`) |
-| care_mode | text (`allopathy` / `ayush`, nullable) |
+| status | text NOT NULL default `'active'` (`active` / `completed` / `cancelled`) |
+| care_mode | text NOT NULL (`allopathy` / `ayush`) |
 | created_at / updated_at | timestamptz |
 
 ### `interview_responses` — CORE
@@ -123,10 +125,14 @@ Anon-writable; contains at least one pre-existing `probe` row from earlier
 testing (left untouched). New code does not write here except the
 `processed=true` verify flag (`POST /api/documents/:id/verify`).
 
-### `interview_questions` — SUPPORTING (lookup, minimal)
-`{ id, question_key, created_at }`. No prompt/options columns were found;
-the questionnaire source of truth is `frontend/src/lib/kiosk-data.ts`.
-Backend does not validate against it.
+### `interview_questions` — SUPPORTING (per-session seed, FK target)
+`{ id, session_id, question_key, question_text, question_order,
+created_at }`. `interview_responses` carries a composite FK
+`(session_id, question_key)` → this table, so the backend seeds the
+mode's question bank on session creation (`seedSessionQuestions`) and
+backfills single keys on answer save (`ensureSessionQuestion`).
+Bank mirrored from `frontend/src/lib/kiosk-data.ts` in
+`backend/src/services/interviewQuestions.ts`. Never hand-edit rows.
 
 ### `medications`, `investigations`, `symptoms`, `interview_alerts`, `audit_logs` — UNUSED by current code
 Tables exist but no endpoint reads/writes them and their columns were not
