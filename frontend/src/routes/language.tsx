@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, Languages, Search, X } from "lucide-react";
+import { ArrowRight, ChevronDown, Languages, Search, X } from "lucide-react";
 import { KioskShell, PageHeading } from "@/components/kiosk/KioskShell";
 import {
+  getAdditionalLanguages,
   getAllLanguages,
-  getPopularLanguages,
+  getMainSupportedLanguages,
   type LanguageCode,
   type LanguageConfig,
 } from "@/lib/languages";
@@ -110,8 +111,17 @@ function LanguagePage() {
   const matches = (lang: LanguageConfig) =>
     lang.name.toLocaleLowerCase().includes(q) || lang.nativeName.toLocaleLowerCase().includes(q);
 
-  const popular = searching ? [] : getPopularLanguages();
-  const all = searching ? getAllLanguages().filter(matches) : getAllLanguages();
+  // 8 fully integrated languages — main cards, unchanged behavior.
+  const main = getMainSupportedLanguages();
+  // Remaining enabled languages — inside the collapsed accordion.
+  const additional = getAdditionalLanguages();
+  // If the stored selection is an additional language, start expanded so
+  // the current choice stays visible.
+  const [moreOpen, setMoreOpen] = useState(() =>
+    additional.some((lang) => lang.code === language),
+  );
+
+  const results = searching ? getAllLanguages().filter(matches) : [];
 
   return (
     <KioskShell step="language">
@@ -145,22 +155,70 @@ function LanguagePage() {
       </div>
 
       <div className="space-y-2">
-        {!searching ? (
+        {searching ? (
           <LanguageSection
-            title={t("popularLanguages")}
-            langs={popular}
+            title={t("allIndianLanguages")}
+            langs={results}
             selected={language}
             onSelect={setLanguage}
+            empty={t("noLanguagesFound")}
           />
-        ) : null}
+        ) : (
+          <>
+            <LanguageSection
+              title={t("popularLanguages")}
+              langs={main}
+              selected={language}
+              onSelect={setLanguage}
+            />
 
-        <LanguageSection
-          title={t("allIndianLanguages")}
-          langs={all}
-          selected={language}
-          onSelect={setLanguage}
-          {...(searching ? { empty: t("noLanguagesFound") } : {})}
-        />
+            <section aria-label={t("moreIndianLanguages")}>
+              <div className="overflow-hidden rounded-3xl border-2 border-border bg-card shadow-card">
+                <button
+                  type="button"
+                  aria-expanded={moreOpen}
+                  aria-controls="more-indian-languages"
+                  onClick={() => setMoreOpen((open) => !open)}
+                  className="flex min-h-20 w-full items-center justify-between gap-4 px-8 text-left active:scale-[0.995]"
+                >
+                  <span className="text-2xl font-extrabold">
+                    {t("moreIndianLanguages")}{" "}
+                    <span className="text-lg font-semibold text-muted-foreground">
+                      ({additional.length})
+                    </span>
+                  </span>
+                  <ChevronDown
+                    aria-hidden
+                    className={cn(
+                      "size-8 shrink-0 text-primary transition-transform duration-200",
+                      moreOpen && "rotate-180",
+                    )}
+                  />
+                </button>
+                <div
+                  id="more-indian-languages"
+                  className={cn(
+                    "grid transition-all duration-300 ease-in-out",
+                    moreOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+                  )}
+                >
+                  <div className="overflow-hidden">
+                    <div className="grid grid-cols-2 gap-4 px-6 pb-6 pt-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                      {additional.map((lang) => (
+                        <LanguageCard
+                          key={lang.code}
+                          lang={lang}
+                          selected={language === lang.code}
+                          onSelect={setLanguage}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </>
+        )}
       </div>
 
       <div className="mt-10 flex justify-end">

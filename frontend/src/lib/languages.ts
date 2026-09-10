@@ -356,6 +356,27 @@ export function getPopularLanguages(): LanguageConfig[] {
   return POPULAR_LANGUAGE_CODES.map((code) => getLanguageConfig(code));
 }
 
+/**
+ * The 8 fully integrated kiosk languages, in the original Popular order.
+ * These render as the main cards. Same objects as SUPPORTED_LANGUAGES —
+ * never duplicated.
+ */
+export const MAIN_SUPPORTED_LANGUAGE_CODES: LanguageCode[] = [...POPULAR_LANGUAGE_CODES];
+
+export function getMainSupportedLanguages(): LanguageConfig[] {
+  return MAIN_SUPPORTED_LANGUAGE_CODES.map((code) => getLanguageConfig(code));
+}
+
+/**
+ * The remaining enabled languages (no full UI translations yet).
+ * Rendered inside the collapsed "More Indian Languages" accordion, in
+ * official SUPPORTED_LANGUAGES order. Behavior on select is unchanged.
+ */
+export function getAdditionalLanguages(): LanguageConfig[] {
+  const main = new Set<LanguageCode>(MAIN_SUPPORTED_LANGUAGE_CODES);
+  return SUPPORTED_LANGUAGES.filter((language) => language.enabled && !main.has(language.code));
+}
+
 export const DEFAULT_LANGUAGE: LanguageConfig = getLanguageConfig(DEFAULT_LANGUAGE_CODE);
 
 /**
@@ -381,6 +402,9 @@ export function validateLanguageConfig(): string[] {
   }
   for (const code of POPULAR_LANGUAGE_CODES) {
     if (!seen.has(code)) problems.push(`Popular code ${code} is not in SUPPORTED_LANGUAGES`);
+  }
+  for (const code of MAIN_SUPPORTED_LANGUAGE_CODES) {
+    if (!seen.has(code)) problems.push(`Main code ${code} is not in SUPPORTED_LANGUAGES`);
   }
   return problems;
 }
