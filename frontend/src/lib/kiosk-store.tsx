@@ -67,6 +67,8 @@ const initialState: KioskState = {
 };
 
 export type KioskContextValue = KioskState & {
+  /** True after the persisted session (if any) has been restored from storage. */
+  hydrated: boolean;
   setLanguage: (code: LanguageCode) => void;
   setIdentityMethod: (method: "abha" | "aadhaar" | "new") => void;
   clearIdentityMethod: () => void;
@@ -90,6 +92,7 @@ const STORAGE_KEY = "medikiosk-session-v1";
 
 export function KioskProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<KioskState>(initialState);
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     try {
@@ -104,6 +107,8 @@ export function KioskProvider({ children }: { children: ReactNode }) {
       }
     } catch {
       /* ignore corrupted session */
+    } finally {
+      setHydrated(true);
     }
   }, []);
 
@@ -133,6 +138,7 @@ export function KioskProvider({ children }: { children: ReactNode }) {
   const value = useMemo<KioskContextValue>(
     () => ({
       ...state,
+      hydrated,
       setLanguage: (language) => patch({ language }),
       setIdentityMethod: (identityMethod) => patch({ identityMethod }),
       clearIdentityMethod: () => patch({ identityMethod: null }),
@@ -160,7 +166,7 @@ export function KioskProvider({ children }: { children: ReactNode }) {
       confirmSummary: () => patch({ summaryConfirmed: true }),
       reset: () => setState(initialState),
     }),
-    [state, patch],
+    [state, hydrated, patch],
   );
 
   return <KioskContext.Provider value={value}>{children}</KioskContext.Provider>;

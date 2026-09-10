@@ -1,7 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { Stethoscope, Leaf } from "lucide-react";
 import { KioskShell, PageHeading } from "@/components/kiosk/KioskShell";
 import { useKiosk, useLanguage } from "@/lib/kiosk-hooks";
+import { canonicalPatientId } from "@/lib/patient";
 import type { CareMode } from "@/lib/kiosk-data";
 import { cn } from "@/lib/utils";
 
@@ -33,9 +35,19 @@ const CARDS: {
 ];
 
 function CarePage() {
-  const { setCareMode, careMode } = useKiosk();
+  const { setCareMode, careMode, patient, hydrated } = useKiosk();
   const { t } = useLanguage();
   const navigate = useNavigate();
+
+  const patientId = canonicalPatientId(patient);
+
+  // Patient-specific step: no active patient context → back to identification.
+  // Wait for the persisted session to restore first so a refresh keeps the patient.
+  useEffect(() => {
+    if (hydrated && !patientId) navigate({ to: "/identity" });
+  }, [hydrated, patientId, navigate]);
+
+  if (!hydrated || !patientId) return null;
 
   return (
     <KioskShell step="care">

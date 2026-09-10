@@ -5,6 +5,7 @@ import { KioskShell, PageHeading } from "@/components/kiosk/KioskShell";
 import { ClinicalSummary } from "@/components/kiosk/ClinicalSummary";
 import { buildSummary, type SummaryRow } from "@/lib/buildSummary";
 import { useKiosk, useLanguage } from "@/lib/kiosk-hooks";
+import { canonicalPatientId } from "@/lib/patient";
 import { translate } from "@/lib/i18n";
 
 export const Route = createFileRoute("/summary")({
@@ -28,15 +29,25 @@ export const Route = createFileRoute("/summary")({
 });
 
 function SummaryPage() {
-  const { careMode, answers, documents, redFlag } = useKiosk();
+  const { careMode, answers, documents, redFlag, patient, hydrated } = useKiosk();
   const { language, t } = useLanguage();
   const navigate = useNavigate();
   const mode = careMode ?? "allopathy";
   const [rows, setRows] = useState<SummaryRow[]>([]);
 
+  const patientId = canonicalPatientId(patient);
+
+  // Patient-specific step: no active patient context → back to identification.
+  // Wait for the persisted session to restore first so a refresh keeps the patient.
+  useEffect(() => {
+    if (hydrated && !patientId) navigate({ to: "/identity" });
+  }, [hydrated, patientId, navigate]);
+
   useEffect(() => {
     setRows(buildSummary(mode, answers, translate(language, "notAnswered"), language));
   }, [mode, answers, language]);
+
+  if (!hydrated || !patientId) return null;
 
   return (
     <KioskShell step="summary">

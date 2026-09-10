@@ -46,6 +46,7 @@ function InterviewPage() {
     voiceAnswers,
     voiceAnswer,
     raiseRedFlag,
+    hydrated,
   } = useKiosk();
   const { language, t } = useLanguage();
   const navigate = useNavigate();
@@ -56,7 +57,9 @@ function InterviewPage() {
 
   // ONE kiosk session = ONE patient = ONE interview session.
   // Created once when Questions starts; every answer reuses it.
+  // Wait for the persisted session to restore first so a refresh keeps the patient.
   useEffect(() => {
+    if (!hydrated) return;
     if (!patientId) {
       navigate({ to: "/identity" });
       return;
@@ -75,7 +78,7 @@ function InterviewPage() {
     return () => {
       cancelled = true;
     };
-  }, [patientId, sessionId, careMode, setSessionId, navigate]);
+  }, [hydrated, patientId, sessionId, careMode, setSessionId, navigate]);
 
   // Persist the consent row against the canonical patient once it exists.
   useEffect(() => {

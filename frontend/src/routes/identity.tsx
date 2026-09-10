@@ -84,7 +84,7 @@ function IdentityPage() {
                 } else if (o.id === "abha") {
                   navigate({ to: "/identity/abha" });
                 } else {
-                  navigate({ to: "/identity/new-patient" });
+                  navigate({ to: "/identity/registration" });
                 }
               }}
               selected={false}

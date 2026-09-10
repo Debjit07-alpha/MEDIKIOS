@@ -1,7 +1,9 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { MessageSquareHeart, FileScan, CalendarClock, FileText, ShieldCheck } from "lucide-react";
 import { KioskShell, PageHeading } from "@/components/kiosk/KioskShell";
 import { useKiosk, useLanguage } from "@/lib/kiosk-hooks";
+import { canonicalPatientId } from "@/lib/patient";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/dashboard")({
@@ -24,9 +26,20 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 function DashboardPage() {
-  const { patient, careMode, documents } = useKiosk();
+  const { patient, careMode, documents, hydrated } = useKiosk();
   const { t } = useLanguage();
   const navigate = useNavigate();
+
+  const patientId = canonicalPatientId(patient);
+
+  // Patient-specific step: no active patient context → back to identification.
+  // Wait for the persisted session to restore first so a refresh keeps the patient.
+  useEffect(() => {
+    if (hydrated && !patientId) navigate({ to: "/identity" });
+  }, [hydrated, patientId, navigate]);
+
+  if (!hydrated || !patientId) return null;
+
   const firstName = patient?.name.split(" ")[0] ?? "friend";
 
   const tiles = [

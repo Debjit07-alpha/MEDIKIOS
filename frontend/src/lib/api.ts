@@ -13,6 +13,8 @@ export interface Patient {
   date_of_birth?: string | null;
   preferred_language?: string | null;
   uhid?: string;
+  /** Write-only: sent at registration, hashed server-side, never returned. */
+  password?: string;
 }
 
 export interface Medicine {
@@ -300,6 +302,34 @@ export const api = {
       }
       return created as Patient;
     },
+
+    login: (body: { loginId?: string; patientCode?: string; password: string }): Promise<{
+      success: boolean;
+      patient: {
+        id: string;
+        patientCode: string;
+        name: string;
+        phoneNumber: string | null;
+        preferredLanguage: string;
+        age?: number | null;
+        gender?: string | null;
+      };
+    }> =>
+      request<{
+        success: boolean;
+        patient: {
+          id: string;
+          patientCode: string;
+          name: string;
+          phoneNumber: string | null;
+          preferredLanguage: string;
+          age?: number | null;
+          gender?: string | null;
+        };
+      }>("/api/patients/login", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
   },
 
   intake: {

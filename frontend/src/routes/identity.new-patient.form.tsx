@@ -22,6 +22,8 @@ function NewPatientFormPage() {
     gender: "",
     mobile: "",
     address: "",
+    password: "",
+    confirmPassword: "",
   });
 
   const [submittedAttempt, setSubmittedAttempt] = useState(false);
@@ -39,9 +41,17 @@ function NewPatientFormPage() {
   const isGenderValid = form.gender !== "";
   const isMobileValid = form.mobile.replace(/\D/g, "").length === 10;
   const isAddressValid = form.address.trim().length >= 5;
+  const isPasswordValid = form.password.length >= 4;
+  const isPasswordMatch = form.password === form.confirmPassword;
 
   const isFormComplete =
-    isNameValid && isAgeValid && isGenderValid && isMobileValid && isAddressValid;
+    isNameValid &&
+    isAgeValid &&
+    isGenderValid &&
+    isMobileValid &&
+    isAddressValid &&
+    isPasswordValid &&
+    isPasswordMatch;
 
   const getValidationErrors = () => {
     const errors: string[] = [];
@@ -50,12 +60,14 @@ function NewPatientFormPage() {
     if (!isGenderValid) errors.push(t("identityGenderValidation"));
     if (!isMobileValid) errors.push(t("identityMobileValidation"));
     if (!isAddressValid) errors.push(t("identityAddressValidation"));
+    if (!isPasswordValid) errors.push(t("identityPasswordValidation"));
+    if (isPasswordValid && !isPasswordMatch) errors.push(t("identityPasswordMatchValidation"));
     return errors;
   };
 
   const goBack = () => {
     clearIdentityMethod();
-    navigate({ to: "/identity/new-patient" });
+    navigate({ to: "/identity/registration" });
   };
 
   const handleSubmit = async (e?: FormEvent) => {
@@ -76,6 +88,7 @@ function NewPatientFormPage() {
         gender: form.gender === "male" ? "Male" : form.gender === "female" ? "Female" : "Other",
         phone_number: form.mobile.replace(/\D/g, ""),
         date_of_birth: form.dob || null,
+        password: form.password,
       });
 
       if (!created?.id) {
@@ -99,7 +112,8 @@ function NewPatientFormPage() {
     } catch (err) {
       console.error("New patient creation error:", err);
       // Inline patient error, NEVER an OCR error!
-      setApiError("Could not create patient record. Please check your details and try again.");
+      const message = err instanceof Error && err.message ? err.message : t("signupCreateFailed");
+      setApiError(message);
       setStatus("form");
     }
   };
@@ -125,10 +139,14 @@ function NewPatientFormPage() {
         <PageHeading title={t("identityNewTitle")} subtitle={t("identityNewSubtitle")} />
         <div className="mx-auto max-w-3xl rounded-4xl border-2 border-success bg-success-soft p-10 text-center shadow-card">
           <CheckCircle2 className="mx-auto size-20 text-success" />
-          <h2 className="mt-6 text-5xl font-extrabold">{t("identityNewCreated")}</h2>
+          <h2 className="mt-6 text-5xl font-extrabold">{t("signupCreated")}</h2>
           <p className="mt-4 text-3xl font-bold">{createdPatient.name}</p>
-          <p className="mt-1 text-xl text-muted-foreground">
-            {createdPatient.age} yrs · {createdPatient.sex} · UHID: {createdPatient.uhid}
+          <p className="mt-4 text-2xl font-extrabold">
+            {t("signupYourIdIs")} {createdPatient.uhid}
+          </p>
+          <p className="mt-2 text-xl text-muted-foreground">{t("signupKeepId")}</p>
+          <p className="mt-3 text-xl text-muted-foreground">
+            {createdPatient.age} yrs · {createdPatient.sex}
           </p>
           <p className="mt-2 text-base text-muted-foreground">
             Mobile: +91 {form.mobile} · OPD Block A
@@ -327,6 +345,55 @@ function NewPatientFormPage() {
               </span>
             ) : null}
           </label>
+
+          {/* Password / PIN for the patient Login ID */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="grid gap-2 text-lg font-bold">
+              <span>
+                {t("regPasswordLabel")} <span className="text-destructive">*</span>
+              </span>
+              <input
+                type="password"
+                value={form.password}
+                onChange={(e) => update("password", e.target.value.slice(0, 32))}
+                placeholder={t("regPasswordPlaceholder")}
+                autoComplete="new-password"
+                className={`min-h-16 rounded-2xl border-2 bg-background p-4 text-xl ${
+                  submittedAttempt && !isPasswordValid
+                    ? "border-destructive ring-1 ring-destructive"
+                    : "border-border"
+                }`}
+              />
+              {submittedAttempt && !isPasswordValid ? (
+                <span className="text-sm font-semibold text-destructive">
+                  {t("identityPasswordValidation")}
+                </span>
+              ) : null}
+            </label>
+
+            <label className="grid gap-2 text-lg font-bold">
+              <span>
+                {t("regPasswordConfirmLabel")} <span className="text-destructive">*</span>
+              </span>
+              <input
+                type="password"
+                value={form.confirmPassword}
+                onChange={(e) => update("confirmPassword", e.target.value.slice(0, 32))}
+                placeholder={t("regPasswordConfirmPlaceholder")}
+                autoComplete="new-password"
+                className={`min-h-16 rounded-2xl border-2 bg-background p-4 text-xl ${
+                  submittedAttempt && isPasswordValid && !isPasswordMatch
+                    ? "border-destructive ring-1 ring-destructive"
+                    : "border-border"
+                }`}
+              />
+              {submittedAttempt && isPasswordValid && !isPasswordMatch ? (
+                <span className="text-sm font-semibold text-destructive">
+                  {t("identityPasswordMatchValidation")}
+                </span>
+              ) : null}
+            </label>
+          </div>
 
           {/* Overall Validation Alert */}
           {submittedAttempt && validationErrors.length > 0 ? (

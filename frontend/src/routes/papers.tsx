@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   FileHeart,
@@ -74,7 +74,7 @@ function ocrErrorMessage(t: (key: TranslationKey) => string, code?: string): str
 }
 
 function PapersPage() {
-  const { addDocument, documents, patient } = useKiosk();
+  const { addDocument, documents, patient, hydrated } = useKiosk();
   const patientId = canonicalPatientId(patient);
   const { t } = useLanguage();
   const navigate = useNavigate();
@@ -89,6 +89,12 @@ function PapersPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeKind, setActiveKind] = useState<DocKind | null>(null);
+
+  // Patient-specific step: no active patient context → back to identification.
+  // Wait for the persisted session to restore first so a refresh keeps the patient.
+  useEffect(() => {
+    if (hydrated && !patientId) navigate({ to: "/identity" });
+  }, [hydrated, patientId, navigate]);
 
   const startScan = (kind: DocKind) => {
     setActiveKind(kind);

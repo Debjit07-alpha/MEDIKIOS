@@ -5,7 +5,7 @@ import express, { Request, Response } from "express";
 import cors from "cors";
 import multer from "multer";
 import OpenAI from "openai";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 
 import voiceRouter from "./routes/voice";
 import ocrRouter, { persistMedicalDocument } from "./routes/ocr";
@@ -191,6 +191,37 @@ app.get("/", (_req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------
+// Patient Login ID + Password helpers.
+// The Login ID is the existing patients.patient_code (display UHID).
+// Passwords are hashed server-side with scrypt; plaintext is never stored
+// and the hash is never returned by any endpoint.
+// ---------------------------------------------------------
+
+// Helper to generate a unique Login ID / Patient Code (e.g. MED-1024).
+function generatePatientCode(): string {
+  const num = Math.floor(1000 + Math.random() * 9000);
+  return `MED-${num}`;
+}
+
+function hashPassword(password: string): string {
+  const salt = randomBytes(16).toString("hex");
+  const derived = scryptSync(password, salt, 64).toString("hex");
+  return ["scrypt", salt, derived].join("$");
+}
+
+function verifyPassword(password: string, stored: string): boolean {
+  try {
+    const parts = stored.split("$");
+    if (parts.length !== 3 || parts[0] !== "scrypt" || !parts[1] || !parts[2]) return false;
+    const derived = scryptSync(password, parts[1], 64);
+    const expected = Buffer.from(parts[2], "hex");
+    if (derived.length !== expected.length || expected.length === 0) return false;
+    return timingSafeEqual(derived, expected);
+  } catch {
+    return false;
+  }
+}
+
 // 2. REGISTER NEW PATIENT
 // ---------------------------------------------------------
 
@@ -207,10 +238,14 @@ app.post("/api/patients", async (req: Request, res: Response) => {
       preferred_language,
       full_name,
       phone_number,
+      patient_code,
+      patientCode,
+      password,
     } = req.body;
 
-    const patientData = {
+    const patientData: Record<string, unknown> = {
       name: name || full_name || "New Patient",
+      patient_code: patient_code || patientCode || generatePatientCode(),
       full_name: full_name || name || null,
       age: age ?? 0,
       gender: gender || "Not stated",
@@ -222,21 +257,54 @@ app.post("/api/patients", async (req: Request, res: Response) => {
       preferred_language: preferred_language || null,
     };
 
-    const { data, error } = await supabase
-      .from("patients")
-      .insert([patientData])
-      .select()
-      .single();
+    // Optional account password (4+ chars, PIN-friendly). Hashed server-side;
+    // only included when supplied. Requires the password_hash column
+    // (see pending migration) — otherwise a clear staff message is returned.
+    if (typeof password === "string" && password.length > 0) {
+      if (password.length < 4) {
+        return res.status(400).json({
+          success: false,
+          error: "Please choose a password or PIN with at least 4 characters.",
+        });
+      }
+      patientData.password_hash = hashPassword(password);
+    }
 
-    if (error) {
-      console.error("Patient creation error:", error);
-
+    // The random Login ID can theoretically collide: regenerate and retry
+    // only when the database reports a uniqueness violation.
+    let data: any = null;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const { data: created, error: insertError } = await supabase
+        .from("patients")
+        .insert([patientData])
+        .select()
+        .single();
+      if (!insertError) {
+        data = created;
+        break;
+      }
+      const msg = (insertError.message || "").toLowerCase();
+      if (msg.includes("password_hash")) {
+        return res.status(400).json({
+          success: false,
+          error: "Patient account setup needs a database update. Please ask staff for help.",
+        });
+      }
+      const isCollision =
+        msg.includes("duplicate") || msg.includes("unique") || (insertError as any).code === "23505";
+      if (isCollision && attempt < 3 && !patient_code && !patientCode) {
+        patientData.patient_code = generatePatientCode();
+        continue;
+      }
+      console.error("Patient creation error:", insertError);
       return res.status(400).json({
         success: false,
-        error: error.message,
+        error: insertError.message,
       });
     }
 
+    // Never leak the password hash to the client.
+    if (data && typeof data === "object") delete (data as any).password_hash;
     return res.status(201).json(data);
   } catch (error: any) {
     console.error("POST /api/patients error:", error);
@@ -249,6 +317,68 @@ app.post("/api/patients", async (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------
+// 2B. PATIENT LOGIN (Login ID + Password).
+// Simple identification for the kiosk demo — NOT Aadhaar/ABHA auth.
+// Verifies the scrypt password_hash server-side. Generic 404 responses
+// so valid Login IDs cannot be enumerated. Creates nothing, lists nothing.
+// ---------------------------------------------------------
+
+app.post("/api/patients/login", async (req: Request, res: Response) => {
+  try {
+    const { loginId, patientCode, password } = req.body || {};
+
+    const id = typeof loginId === "string" ? loginId.trim() : typeof patientCode === "string" ? patientCode.trim() : "";
+    if (!id || typeof password !== "string" || !password) {
+      return res.status(400).json({
+        success: false,
+        error: "Please enter your Login ID and password.",
+      });
+    }
+
+    const INVALID = "Invalid Login ID or password.";
+    // Pre-migration (no password_hash column yet) no account can verify,
+    // so every attempt is an invalid login — never a 500.
+    let candidates: any[] = [];
+    try {
+      const found = await supabase
+        .from("patients")
+        .select("id, patient_code, name, full_name, age, gender, phone, phone_number, preferred_language, password_hash")
+        .ilike("patient_code", id);
+      if (found.error) throw found.error;
+      candidates = found.data || [];
+    } catch (lookupError: any) {
+      const m = String(lookupError?.message || "").toLowerCase();
+      if (m.includes("password_hash")) {
+        return res.status(404).json({ success: false, error: INVALID });
+      }
+      throw lookupError;
+    }
+    const matched = (candidates || [])[0];
+    if (!matched || typeof matched.password_hash !== "string" || !verifyPassword(password, matched.password_hash)) {
+      return res.status(404).json({ success: false, error: INVALID });
+    }
+
+    return res.json({
+      success: true,
+      patient: {
+        id: matched.id,
+        patientCode: matched.patient_code || matched.id,
+        name: matched.name || matched.full_name || "Patient",
+        phoneNumber: matched.phone || matched.phone_number || null,
+        preferredLanguage: matched.preferred_language || "en",
+        age: matched.age ?? null,
+        gender: matched.gender || null,
+      },
+    });
+  } catch (error: any) {
+    console.error("POST /api/patients/login error:", error?.message || error);
+    return res.status(500).json({
+      success: false,
+      error: "Unable to verify your details right now. Please try again or ask staff for help.",
+    });
+  }
+});
+
 // 3. IDENTIFY PATIENT
 // ---------------------------------------------------------
 
