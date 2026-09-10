@@ -350,6 +350,7 @@ router.post("/save", (req: Request, res: Response) => {
         file,
         patientId: validate.patientId,
         saveKey: validate.saveKey,
+        sessionId: validate.sessionId,
         documentType: validate.documentType,
         rawOcrText: validate.rawOcrText,
         analysis: validate.analysis,
@@ -378,6 +379,7 @@ router.post("/save", (req: Request, res: Response) => {
 interface ValidatedSaveRequest {
   patientId: string;
   saveKey: string;
+  sessionId: string | null;
   documentType: string;
   rawOcrText: string;
   /** Null for OCR-only saves (Gemini unavailable). Nothing is invented. */
@@ -401,6 +403,12 @@ function validateSaveRequest(body: Record<string, unknown>):
 
   const saveKey = typeof body.saveKey === "string" ? body.saveKey.trim() : "";
   if (!saveKey) return { ok: false, error: "NO_SAVE_KEY" };
+
+  // Optional link to the kiosk interview session. Only a real session UUID
+  // is stored; anything else falls back to a generated value at insert time.
+  const rawSessionId =
+    typeof body.sessionId === "string" ? body.sessionId.trim() : "";
+  const sessionId = isUuid(rawSessionId) ? rawSessionId : null;
 
   const documentType =
     typeof body.documentType === "string" ? body.documentType.trim() : "";
@@ -457,13 +465,14 @@ function validateSaveRequest(body: Record<string, unknown>):
       .slice(0, 20);
   }
 
-  return { ok: true, patientId, saveKey, documentType, rawOcrText, analysis, analysisStatus, warnings };
+  return { ok: true, patientId, saveKey, sessionId, documentType, rawOcrText, analysis, analysisStatus, warnings };
 }
 
 interface PersistInput {
   file: Express.Multer.File;
   patientId: string;
   saveKey: string;
+  sessionId?: string | null;
   documentType: string;
   rawOcrText: string;
   analysis: Record<string, unknown> | null;
@@ -591,7 +600,9 @@ export async function saveOcrDocument(input: PersistInput): Promise<PersistResul
   }
   const docRecord = await insertMedicalDocumentRow({
     patient_id: patientUuid,
-    session_id: isUuid(input.saveKey) ? input.saveKey : randomUUID(),
+    // Prefer the real kiosk interview session so the document links to the
+    // same visit; only fall back to a generated id when none was provided.
+    session_id: isUuid(input.sessionId || "") ? input.sessionId : (isUuid(input.saveKey) ? input.saveKey : randomUUID()),
     document_type: dbDocumentType(input.documentType),
     original_file_name: input.file.originalname,
     mime_type: input.file.mimetype,
@@ -611,55 +622,58 @@ export async function saveOcrDocument(input: PersistInput): Promise<PersistResul
 }
 
 /**
- * Inserts one medical_documents row. If the optional structured_data
- * column has not been added to the database yet (Postgres 42703
- * undefined_column), the save still succeeds with the original document
- * reference + raw OCR text, and the exact missing-column DDL is logged
- * for the operator. The document itself is never lost because of an
- * analytics column.
+ * Whether medical_documents.structured_data exists. Probed once against the
+ * live schema: PostgREST reports a missing column as PGRST204 (schema cache),
+ * Postgres-direct as 42703. The column is absent in production, and sending
+ * it — even as null — rejects the entire insert, which was the real
+ * "Save & Continue" failure.
+ */
+let structuredDataSupported: boolean | null = null;
+
+async function supportsStructuredData(): Promise<boolean> {
+  if (structuredDataSupported !== null) return structuredDataSupported;
+  const { error } = await supabase
+    .from("medical_documents")
+    .select("structured_data")
+    .limit(1);
+  structuredDataSupported =
+    !error || (error.code !== "PGRST204" && (error as { code?: string }).code !== "42703");
+  if (!structuredDataSupported) {
+    console.error(
+      "medical_documents.structured_data column is missing; storing raw OCR text only. " +
+        "Operator action: ALTER TABLE medical_documents ADD COLUMN structured_data JSONB;",
+    );
+  }
+  return structuredDataSupported;
+}
+
+/**
+ * Inserts one medical_documents row, including structured analysis data only
+ * when the column actually exists. The document itself is never lost because
+ * of an analytics column.
  */
 async function insertMedicalDocumentRow(
   row: Record<string, unknown>,
 ): Promise<{ id: string; storage_path: string }> {
-  const first = await supabase
+  const insertRow = { ...row };
+  if ("structured_data" in insertRow && !(await supportsStructuredData())) {
+    delete insertRow.structured_data;
+  }
+  const result = await supabase
     .from("medical_documents")
-    .insert([row])
+    .insert([insertRow])
     .select("id, storage_path")
     .single();
 
-  if (!first.error && first.data) {
+  if (!result.error && result.data) {
     return {
-      id: first.data.id as string,
-      storage_path: first.data.storage_path as string,
+      id: result.data.id as string,
+      storage_path: result.data.storage_path as string,
     };
   }
 
-  const code = (first.error as { code?: string } | null)?.code;
-  if (code === "42703" && "structured_data" in row) {
-    console.error(
-      "medical_documents.structured_data column is missing; stored OCR text without structured analysis. " +
-        "Operator action: ALTER TABLE medical_documents ADD COLUMN structured_data JSONB;",
-    );
-    const { ...withoutStructured } = row;
-    delete (withoutStructured as Record<string, unknown>).structured_data;
-    const retry = await supabase
-      .from("medical_documents")
-      .insert([withoutStructured])
-      .select("id, storage_path")
-      .single();
-    if (!retry.error && retry.data) {
-      return {
-        id: retry.data.id as string,
-        storage_path: retry.data.storage_path as string,
-      };
-    }
-    throw new Error(
-      retry.error?.message || "Medical document record could not be created.",
-    );
-  }
-
   throw new Error(
-    first.error?.message || "Medical document record could not be created.",
+    result.error?.message || "Medical document record could not be created.",
   );
 }
 

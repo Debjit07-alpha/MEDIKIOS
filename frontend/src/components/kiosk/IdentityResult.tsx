@@ -51,11 +51,15 @@ export function IdentityResult({ method, submit, autoStart = false, errorMessage
     setErrorText(null);
     try {
       const result = await submit();
+      if (!result?.id) {
+        throw new Error("No patient id returned");
+      }
       const formatted = {
+        id: result.id,
         name: result.name,
         age: result.age,
         sex: result.gender || "Other",
-        uhid: result.id,
+        uhid: result.patient_code || result.id,
         route: method,
       } satisfies Patient;
       setPatient(formatted);

@@ -47,11 +47,16 @@ function AadhaarScanPage() {
           value: "demo_biometric_thumb",
         });
 
+        if (!result?.id) {
+          throw new Error("No patient id returned");
+        }
+
         const patientRecord: Patient = {
+          id: result.id,
           name: result.name || "Sunita Devi (Demo)",
           age: result.age || 58,
           sex: result.gender || "Female",
-          uhid: result.id || "DGH/2026/8421",
+          uhid: result.patient_code || result.id,
           route: "aadhaar",
         };
 

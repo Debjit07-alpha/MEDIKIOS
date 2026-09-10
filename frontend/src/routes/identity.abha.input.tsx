@@ -53,11 +53,15 @@ function AbhaInputPage() {
 
     try {
       const result = await api.patients.identify({ method: "abha", value: abhaNumber });
+      if (!result?.id) {
+        throw new Error("No patient id returned");
+      }
       const patientRecord: Patient = {
+        id: result.id,
         name: result.name || "Ramesh Kumar",
         age: result.age || 52,
         sex: result.gender || "Male",
-        uhid: result.id || `DGH-ABHA-${abhaNumber.slice(-4)}`,
+        uhid: result.patient_code || result.id,
         route: "abha",
       };
       setPatient(patientRecord);

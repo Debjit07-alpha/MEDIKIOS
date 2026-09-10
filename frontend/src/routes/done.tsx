@@ -6,6 +6,7 @@ import { ListenButton } from "@/components/kiosk/ListenButton";
 import { DoctorSummaryView } from "@/components/kiosk/DoctorSummaryView";
 import { useKiosk, useLanguage } from "@/lib/kiosk-hooks";
 import { api } from "@/lib/api";
+import { canonicalPatientId } from "@/lib/patient";
 
 type DoctorSummaryContent = {
   patientLanguage?: string;
@@ -53,7 +54,8 @@ function DonePage() {
   useEffect(() => {
     if (!summaryConfirmed) return;
 
-    if (!patient?.uhid) {
+    const patientId = canonicalPatientId(patient);
+    if (!patientId) {
       setLoadingSummary(false);
       setSummaryError(true);
       return;
@@ -64,7 +66,7 @@ function DonePage() {
     const fetchSummary = async () => {
       setLoadingSummary(true);
       try {
-        const result = await api.summary.getDoctor(patient.uhid);
+        const result = await api.summary.getDoctor(patientId);
         if (!cancelled && result.success && result.doctorSummary?.content) {
           setDoctorSummary(result.doctorSummary.content as DoctorSummaryContent);
         }
@@ -80,7 +82,7 @@ function DonePage() {
     return () => {
       cancelled = true;
     };
-  }, [summaryConfirmed, patient?.uhid]);
+  }, [summaryConfirmed, patient]);
 
   return (
     <KioskShell showSteps={false}>

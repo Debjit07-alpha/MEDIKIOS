@@ -27,6 +27,7 @@ import {
 import { KioskShell, PageHeading } from "@/components/kiosk/KioskShell";
 import { ListenButton } from "@/components/kiosk/ListenButton";
 import { api, type OcrAnalyzeResponse, type OcrConfidence, type OcrDocumentType } from "@/lib/api";
+import { canonicalPatientId } from "@/lib/patient";
 import { useKiosk, useLanguage } from "@/lib/kiosk-hooks";
 import type { DocKind } from "@/lib/kiosk-data";
 import type { TranslationKey } from "@/lib/i18n";
@@ -255,7 +256,8 @@ function itemMatches(query: string, ...fields: (string | null | undefined)[]): b
 
 function OcrLabPage() {
   const navigate = useNavigate();
-  const { patient, addDocument } = useKiosk();
+  const { patient, sessionId, addDocument } = useKiosk();
+  const patientId = canonicalPatientId(patient);
   const { t } = useLanguage();
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -349,7 +351,7 @@ function OcrLabPage() {
     if (!file || !result || !rawText.trim()) return;
     if (saveState === "saving" || saveState === "saved") return;
 
-    if (!patient) {
+    if (!patientId) {
       setSaveError(t("ocrSaveNeedsPatient"));
       setSaveState("failed");
       return;
@@ -365,7 +367,8 @@ function OcrLabPage() {
 
     try {
       await api.ocr.saveDocument({
-        patientId: patient.uhid,
+        patientId,
+        sessionId,
         file,
         saveKey: saveKeyRef.current,
         documentType,

@@ -5,6 +5,7 @@ import { KioskShell, PageHeading } from "@/components/kiosk/KioskShell";
 import { ListenButton } from "@/components/kiosk/ListenButton";
 import { useKiosk, useLanguage } from "@/lib/kiosk-hooks";
 import { api } from "@/lib/api";
+import { canonicalPatientId } from "@/lib/patient";
 import { buildEnglishSummaryRows, buildSummary } from "@/lib/buildSummary";
 import { translate } from "@/lib/i18n";
 
@@ -48,6 +49,7 @@ function SharePage() {
     markShared,
     confirmSummary,
     patient,
+    sessionId,
     careMode,
     answers,
     voiceAnswers,
@@ -59,8 +61,14 @@ function SharePage() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [generating, setGenerating] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
+
+  const patientId = canonicalPatientId(patient);
 
   const generateDoctorSummary = async (shareScope: "abha" | "hospital") => {
+    if (!patientId) {
+      throw new Error("No registered patient for this kiosk session");
+    }
     const mode = careMode ?? "allopathy";
     const doctorSummaryRows = buildEnglishSummaryRows(mode, answers);
     const patientSummaryRows = buildSummary(
@@ -70,37 +78,59 @@ function SharePage() {
       language,
     );
 
-    try {
-      await withTimeout(
-        api.summary.generateDoctor({
-          patientId: patient?.uhid || `demo-${Date.now()}`,
-          patientLanguage: language,
-          careMode: mode,
-          patient: patient
-            ? { name: patient.name, age: patient.age, sex: patient.sex, uhid: patient.uhid }
-            : null,
-          answers,
-          voiceAnswers,
-          documents: documents as unknown[],
-          redFlag,
-          doctorSummaryRows,
-          patientSummaryRows,
-          shareScope,
-        }),
-        15000,
-      );
-    } catch (err) {
-      console.warn("Doctor summary generation failed, proceeding anyway:", err);
+    // Consultation row for the doctor queue, linked to the SAME patients.id.
+    await api.consultations.create({
+      patientId,
+      status: shareScope === "abha" ? "shared_abha" : "shared_hospital",
+    });
+
+    const result = await withTimeout(
+      api.summary.generateDoctor({
+        patientId,
+        patientLanguage: language,
+        careMode: mode,
+        patient: patient
+          ? { name: patient.name, age: patient.age, sex: patient.sex, uhid: patient.uhid }
+          : null,
+        answers,
+        voiceAnswers,
+        documents: documents as unknown[],
+        redFlag,
+        doctorSummaryRows,
+        patientSummaryRows,
+        shareScope,
+      }),
+      15000,
+    );
+
+    // Close the interview session best-effort; the summary is already stored.
+    if (sessionId) {
+      await api.interview.completeSession(sessionId).catch((err) => {
+        console.warn("Failed to complete interview session:", err);
+      });
     }
+
+    return result;
   };
 
   const finish = async (share: boolean) => {
     setGenerating(true);
-    confirmSummary();
-    if (share) markShared();
+    setShareError(null);
 
     const scope = shared || share ? "abha" : "hospital";
-    await generateDoctorSummary(scope);
+    try {
+      await generateDoctorSummary(scope);
+    } catch (err) {
+      console.error("Doctor summary generation failed:", err);
+      setShareError(
+        "Could not save the clinical summary. Please check the connection and try again.",
+      );
+      setGenerating(false);
+      return;
+    }
+
+    confirmSummary();
+    if (share) markShared();
 
     navigate({ to: "/done" });
   };
@@ -109,6 +139,23 @@ function SharePage() {
     <KioskShell step="share">
       <PageHeading title={t("shareTitle")} subtitle={t("shareSubtitle")} />
       <ListenButton text={t("shareConsent")} label={t("consentPlay")} autoPlay />
+
+      {!patientId ? (
+        <div
+          role="alert"
+          className="mt-6 rounded-2xl border-2 border-destructive/40 bg-destructive-soft p-5 text-lg font-bold text-destructive"
+        >
+          No registered patient for this kiosk session. Please complete identity first.
+        </div>
+      ) : null}
+      {shareError ? (
+        <div
+          role="alert"
+          className="mt-6 rounded-2xl border-2 border-destructive/40 bg-destructive-soft p-5 text-lg font-bold text-destructive"
+        >
+          {shareError}
+        </div>
+      ) : null}
 
       {generating ? (
         <div className="mt-6 flex flex-col items-center gap-4 rounded-4xl border-2 border-primary bg-primary-soft p-10 shadow-card">

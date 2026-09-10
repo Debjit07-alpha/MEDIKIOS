@@ -74,15 +74,22 @@ function NewPatientFormPage() {
         name: form.name.trim(),
         age: Number(form.age),
         gender: form.gender === "male" ? "Male" : form.gender === "female" ? "Female" : "Other",
+        phone_number: form.mobile.replace(/\D/g, ""),
+        date_of_birth: form.dob || null,
       });
 
+      if (!created?.id) {
+        throw new Error("Backend did not return a patient id");
+      }
+
       const patientRecord: Patient = {
+        id: created.id,
         name: created.name || form.name.trim(),
         age: created.age || Number(form.age),
         sex:
           created.gender ||
           (form.gender === "male" ? "Male" : form.gender === "female" ? "Female" : "Other"),
-        uhid: created.id || `DGH/2026/${Math.floor(1000 + Math.random() * 9000)}`,
+        uhid: created.patient_code || created.id,
         route: "new",
       };
 

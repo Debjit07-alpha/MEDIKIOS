@@ -9,6 +9,7 @@ import { hasLocalizedQuestionPrompt, localizeQuestion } from "@/lib/question-i18
 import { useKiosk, useLanguage } from "@/lib/kiosk-hooks";
 import { getSpeechLocale } from "@/lib/speech";
 import { api } from "@/lib/api";
+import { canonicalPatientId } from "@/lib/patient";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/interview")({
@@ -32,11 +33,58 @@ export const Route = createFileRoute("/interview")({
 });
 
 function InterviewPage() {
-  const { careMode, answers, answer, patient, voiceAnswers, voiceAnswer, raiseRedFlag } =
-    useKiosk();
+  const {
+    careMode,
+    answers,
+    answer,
+    patient,
+    sessionId,
+    setSessionId,
+    consent,
+    consentSynced,
+    markConsentSynced,
+    voiceAnswers,
+    voiceAnswer,
+    raiseRedFlag,
+  } = useKiosk();
   const { language, t } = useLanguage();
   const navigate = useNavigate();
   const [index, setIndex] = useState(0);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+
+  const patientId = canonicalPatientId(patient);
+
+  // ONE kiosk session = ONE patient = ONE interview session.
+  // Created once when Questions starts; every answer reuses it.
+  useEffect(() => {
+    if (!patientId) {
+      navigate({ to: "/identity" });
+      return;
+    }
+    if (sessionId) return;
+    let cancelled = false;
+    api.interview
+      .ensureSession({ patientId, careMode: careMode ?? "allopathy" })
+      .then((res) => {
+        if (!cancelled && res?.data?.id) setSessionId(res.data.id);
+      })
+      .catch((error) => {
+        console.error("Failed to create interview session", error);
+        if (!cancelled) setSessionError("Could not start the interview session. Please try again.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [patientId, sessionId, careMode, setSessionId, navigate]);
+
+  // Persist the consent row against the canonical patient once it exists.
+  useEffect(() => {
+    if (!patientId || !consent || consentSynced) return;
+    api.consents
+      .save({ patientId, purpose: "kiosk_care", consentGiven: true })
+      .then(() => markConsentSynced())
+      .catch((error) => console.error("Failed to sync consent", error));
+  }, [patientId, consent, consentSynced, markConsentSynced]);
 
   const pool = useMemo(() => questionsForMode(careMode ?? "allopathy"), [careMode]);
   const visible = useMemo(
@@ -62,6 +110,19 @@ function InterviewPage() {
 
   const progress = Math.round(((index + 1) / visible.length) * 100);
 
+  const persistAnswer = (questionId: string, responseText: string, responseType: string) => {
+    if (!patientId) return;
+    api.interview
+      .saveResponse({ patientId, sessionId, questionId, responseText, responseType })
+      .then((res) => {
+        // Backend reuses the open session; adopt the id it confirms.
+        if (res?.sessionId && res.sessionId !== sessionId) setSessionId(res.sessionId);
+      })
+      .catch((error) => {
+        console.error("Failed to persist interview answer", { questionId, error });
+      });
+  };
+
   const choose = (optionId: string) => {
     const option = question.options.find((o) => o.id === optionId);
     const next = question.multi
@@ -72,6 +133,9 @@ function InterviewPage() {
           )
       : [optionId];
     answer(question.id, next);
+    // Persist EVERY tap to Supabase (upsert: one current row per
+    // session + question), not just React state.
+    persistAnswer(question.id, JSON.stringify(next), "option");
 
     if (option?.redFlag) {
       const localizedOption = localizedQuestion?.options.find((o) => o.id === option.id);
@@ -95,22 +159,9 @@ function InterviewPage() {
     const text = transcript.trim();
     if (!text) return;
     voiceAnswer(question.id, text);
-    api.interview
-      .saveResponse({
-        patientId: patient?.uhid ?? "",
-        questionId: question.id,
-        responseText: text,
-        responseType: "voice",
-      })
-      .then(() => {
-        console.info("Free-form voice answer saved to backend", { questionId: question.id });
-      })
-      .catch((error) => {
-        console.error("Failed to save free-form voice answer to backend", {
-          questionId: question.id,
-          error,
-        });
-      });
+    // Free-form voice: the actual transcript is stored verbatim with
+    // response_type voice. NEVER replaced with the first option.
+    persistAnswer(question.id, text, "voice");
   };
 
   const goNext = () => {
@@ -123,6 +174,14 @@ function InterviewPage() {
 
   return (
     <KioskShell step="questions">
+      {sessionError ? (
+        <div
+          role="alert"
+          className="mb-6 rounded-2xl border-2 border-destructive/40 bg-destructive-soft p-5 text-lg font-bold text-destructive"
+        >
+          {sessionError}
+        </div>
+      ) : null}
       <div className="mb-6">
         <div className="flex items-center justify-between text-lg font-semibold text-muted-foreground">
           <span>

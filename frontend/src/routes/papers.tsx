@@ -17,6 +17,7 @@ import { DocumentCard } from "@/components/kiosk/DocumentCard";
 import type { DocKind, ExtractedDoc } from "@/lib/kiosk-data";
 import { useKiosk, useLanguage } from "@/lib/kiosk-hooks";
 import { api, type Medicine } from "@/lib/api";
+import { canonicalPatientId } from "@/lib/patient";
 import type { TranslationKey } from "@/lib/i18n";
 
 export const Route = createFileRoute("/papers")({
@@ -74,6 +75,7 @@ function ocrErrorMessage(t: (key: TranslationKey) => string, code?: string): str
 
 function PapersPage() {
   const { addDocument, documents, patient } = useKiosk();
+  const patientId = canonicalPatientId(patient);
   const { t } = useLanguage();
   const navigate = useNavigate();
   const stages = [t("capturing"), t("readingAi"), t("storing")];
@@ -121,7 +123,7 @@ function PapersPage() {
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (event.target) event.target.value = "";
-    if (!file || !patient || !activeKind) return;
+    if (!file || !patientId || !activeKind) return;
 
     if (!ALLOWED_FILE_TYPES.test(file.type) && file.type !== "application/pdf") {
       setError(t("ocrNoText"));
@@ -146,14 +148,14 @@ function PapersPage() {
   };
 
   const handleStore = async () => {
-    if (!pendingFile || !patient || !activeKind) return;
+    if (!pendingFile || !patientId || !activeKind) return;
 
     setReviewing(false);
     setStage(2);
     setError(null);
 
     try {
-      const response = await api.documents.analyze(patient.uhid || "", pendingFile, extractedText);
+      const response = await api.documents.analyze(patientId, pendingFile, extractedText);
 
       if (!response) throw new Error("Empty response");
 

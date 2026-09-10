@@ -9,14 +9,10 @@ import { createHash } from "node:crypto";
 
 import voiceRouter from "./routes/voice";
 import ocrRouter, { persistMedicalDocument } from "./routes/ocr";
-import { supabase } from "./database/supabase";
+import { supabase, writeErrorMessage } from "./database/supabase";
 import { ocrImage, ocrHttpResponse } from "./services/ocr";
 import { aiConfigured, aiModelName, aiProviderName } from "./services/aiMedical";
 import {
-  DOCTOR_SUMMARY_QUESTION_ID,
-  DOCTOR_SUMMARY_RESPONSE_TYPE,
-  PATIENT_SUMMARY_QUESTION_ID,
-  PATIENT_SUMMARY_RESPONSE_TYPE,
   generateDoctorEnglishSummary,
   enhanceWithAi,
   type PatientDoctorSummaryPayload,
@@ -37,6 +33,50 @@ app.use(express.json());
 
 app.use("/api/voice", voiceRouter);
 app.use("/api/ocr", ocrRouter);
+
+// ---------------------------------------------------------
+// Canonical patient identity helpers
+// ---------------------------------------------------------
+// ONE KIOSK SESSION = ONE PATIENT. Every patient-specific write must
+// reference the SAME patients.id UUID created at registration. Names,
+// codes, phones or Aadhaar values are NEVER used as relational keys.
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUuid(value: unknown): value is string {
+  return typeof value === "string" && UUID_PATTERN.test(value);
+}
+
+async function patientExists(patientId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("patients")
+    .select("id")
+    .eq("id", patientId)
+    .maybeSingle();
+  return !error && !!data;
+}
+
+/** Find the open interview session for a patient, if any. */
+async function openSessionFor(patientId: string) {
+  const { data, error } = await supabase
+    .from("interview_sessions")
+    .select("*")
+    .eq("patient_id", patientId)
+    .eq("status", "in_progress")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw dbError(error, "Reading the interview session");
+  return data;
+}
+
+/** Preserve Supabase error codes while adding an actionable message. */
+function dbError(error: any, action: string): Error {
+  const err = new Error(writeErrorMessage(error, action));
+  (err as any).code = error?.code;
+  return err;
+}
 
 // ---------------------------------------------------------
 // External Clients
@@ -82,9 +122,11 @@ app.post("/api/patients", async (req: Request, res: Response) => {
 
     const patientData = {
       name: name || full_name || "New Patient",
+      full_name: full_name || name || null,
       age: age ?? 0,
       gender: gender || "Not stated",
       phone: phone || phone_number || null,
+      phone_number: phone_number || phone || null,
       abha_number: abha_number || null,
       aadhaar_id: aadhaar_id || null,
       date_of_birth: date_of_birth || null,
@@ -172,6 +214,190 @@ app.post("/api/patients/identify", async (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------
+// 3b. GET SINGLE PATIENT (canonical record for a kiosk session)
+// ---------------------------------------------------------
+
+app.get("/api/patients/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    if (!isUuid(id)) {
+      return res.status(400).json({
+        success: false,
+        error: "A valid patient UUID is required",
+      });
+    }
+
+    const { data, error } = await supabase
+      .from("patients")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    if (!data) {
+      return res.status(404).json({ success: false, error: "Patient not found" });
+    }
+
+    return res.json(data);
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: error.message || "Failed to fetch patient",
+    });
+  }
+});
+
+// ---------------------------------------------------------
+// 3c. UPDATE PATIENT (Phase 5: UPDATE the SAME patients.id,
+// never INSERT a second row when details arrive later)
+// ---------------------------------------------------------
+
+const PATIENT_UPDATABLE_FIELDS = [
+  "name",
+  "full_name",
+  "age",
+  "gender",
+  "phone",
+  "phone_number",
+  "abha_number",
+  "aadhaar_id",
+  "date_of_birth",
+  "preferred_language",
+] as const;
+
+app.patch("/api/patients/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    if (!isUuid(id)) {
+      return res.status(400).json({
+        success: false,
+        error: "A valid patient UUID is required",
+      });
+    }
+
+    const patch: Record<string, unknown> = {};
+    for (const field of PATIENT_UPDATABLE_FIELDS) {
+      if (req.body?.[field] !== undefined) patch[field] = req.body[field];
+    }
+
+    if (Object.keys(patch).length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "No updatable patient fields provided",
+      });
+    }
+
+    const { data, error } = await supabase
+      .from("patients")
+      .update(patch)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Patient update error:", error);
+      return res.status(400).json({ success: false, error: error.message });
+    }
+
+    return res.json(data);
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: error.message || "Failed to update patient",
+    });
+  }
+});
+
+// ---------------------------------------------------------
+// 3d. SAVE CONSENT (linked to the canonical patients.id)
+// ---------------------------------------------------------
+
+app.post("/api/consents", async (req: Request, res: Response) => {
+  try {
+    const { patientId, patient_id, purpose, consentGiven } = req.body || {};
+    const pid = patientId || patient_id;
+
+    if (!isUuid(pid)) {
+      return res.status(400).json({
+        success: false,
+        error: "A valid patient UUID is required",
+      });
+    }
+
+    if (!(await patientExists(pid))) {
+      return res.status(404).json({ success: false, error: "Patient not found" });
+    }
+
+    const { data, error } = await supabase
+      .from("consents")
+      .insert([
+        {
+          patient_id: pid,
+          purpose: purpose || "kiosk_care",
+          consent_given: consentGiven !== false,
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+
+    return res.status(201).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: error.message || "Failed to save consent",
+    });
+  }
+});
+
+// ---------------------------------------------------------
+// 3e. CREATE CONSULTATION (linked to the canonical patients.id)
+// ---------------------------------------------------------
+
+app.post("/api/consultations", async (req: Request, res: Response) => {
+  try {
+    const { patientId, patient_id, status } = req.body || {};
+    const pid = patientId || patient_id;
+
+    if (!isUuid(pid)) {
+      return res.status(400).json({
+        success: false,
+        error: "A valid patient UUID is required",
+      });
+    }
+
+    if (!(await patientExists(pid))) {
+      return res.status(404).json({ success: false, error: "Patient not found" });
+    }
+
+    const { data, error } = await supabase
+      .from("consultations")
+      .insert([{ patient_id: pid, status: status || "waiting" }])
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+
+    return res.status(201).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: error.message || "Failed to create consultation",
+    });
+  }
+});
+
+// ---------------------------------------------------------
 // 4. SAVE INTAKE
 // ---------------------------------------------------------
 
@@ -223,65 +449,197 @@ app.post("/api/intake", async (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------
-// 4b. SAVE INTERVIEW RESPONSE
+// 4b. INTERVIEW SESSION (ONE session per kiosk visit).
+// Create once when Questions starts; reuse while in_progress.
+// ---------------------------------------------------------
+
+app.post("/api/interview/session", async (req: Request, res: Response) => {
+  try {
+    const { patientId, patient_id, careMode, care_mode } = req.body || {};
+    const pid = patientId || patient_id;
+    const mode = careMode || care_mode || null;
+
+    if (!isUuid(pid)) {
+      return res.status(400).json({
+        success: false,
+        error: "A valid patient UUID is required",
+      });
+    }
+
+    if (!(await patientExists(pid))) {
+      return res.status(404).json({ success: false, error: "Patient not found" });
+    }
+
+    const existing = await openSessionFor(pid);
+    if (existing) {
+      return res.json({ success: true, data: existing, reused: true });
+    }
+
+    const { data, error } = await supabase
+      .from("interview_sessions")
+      .insert([{ patient_id: pid, status: "in_progress", care_mode: mode }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Interview session creation error:", error);
+      return res.status(400).json({ success: false, error: error.message });
+    }
+
+    return res.status(201).json({ success: true, data, reused: false });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: error.message || "Failed to create interview session",
+    });
+  }
+});
+
+app.post("/api/interview/session/:id/complete", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    if (!isUuid(id)) {
+      return res.status(400).json({ success: false, error: "A valid session UUID is required" });
+    }
+
+    const { data, error } = await supabase
+      .from("interview_sessions")
+      .update({ status: "completed" })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+
+    return res.json({ success: true, data });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: error.message || "Failed to complete interview session",
+    });
+  }
+});
+
+// ---------------------------------------------------------
+// 4c. SAVE INTERVIEW RESPONSE (real schema:
+// interview_responses { session_id, question_key, answer }).
+// One current row per session + question: re-answering UPDATES.
 // ---------------------------------------------------------
 
 app.post("/api/interview/response", async (req: Request, res: Response) => {
   try {
     const {
       patientId,
+      patient_id,
+      sessionId,
+      session_id,
       questionId,
+      question_id,
+      questionKey,
       responseText,
+      answer,
       responseType,
-    } = req.body;
+    } = req.body || {};
 
-    if (!patientId) {
+    const pid = patientId || patient_id;
+    const qkey = questionId || question_id || questionKey;
+    // Frontend sends option taps as a JSON array string and free-form
+    // voice as the raw transcript. Stored verbatim in answer (text):
+    // NO double-stringify, NO undefined values.
+    const answerText = responseText ?? answer;
+    const rtype = responseType || "option";
+
+    if (!isUuid(pid)) {
       return res.status(400).json({
         success: false,
-        error: "patientId is required",
+        error: "A valid patient UUID is required",
       });
     }
 
-    if (!questionId) {
+    if (!qkey || typeof qkey !== "string") {
       return res.status(400).json({
         success: false,
         error: "questionId is required",
       });
     }
 
-    if (!responseText) {
+    if (typeof answerText !== "string" || !answerText.trim()) {
       return res.status(400).json({
         success: false,
         error: "responseText is required",
       });
     }
 
-    const { data, error } = await supabase
-      .from("interview_responses")
-      .insert([
-        {
-          patient_id: patientId,
-          question_id: questionId,
-          response_text: responseText,
-          response_type: responseType || "voice",
-        },
-      ])
-      .select()
-      .single();
-
-    if (error) {
-      console.error("Interview response save error:", error);
-
-      return res.status(400).json({
-        success: false,
-        error: error.message,
-      });
+    // Resolve the session: explicit sessionId wins (must belong to the
+    // patient), otherwise reuse the open session, otherwise create one.
+    // NEVER one session per question or per route transition.
+    let session: any = null;
+    const sid = sessionId || session_id;
+    if (isUuid(sid)) {
+      const { data, error } = await supabase
+        .from("interview_sessions")
+        .select("*")
+        .eq("id", sid)
+        .maybeSingle();
+      if (error) throw dbError(error, "Reading the interview session");
+      if (!data || data.patient_id !== pid) {
+        return res.status(400).json({
+          success: false,
+          error: "Interview session does not belong to this patient",
+        });
+      }
+      session = data;
+    } else {
+      session = await openSessionFor(pid);
+      if (!session) {
+        const { data, error } = await supabase
+          .from("interview_sessions")
+          .insert([{ patient_id: pid, status: "in_progress" }])
+          .select()
+          .single();
+        if (error) throw dbError(error, "Creating the interview session");
+        session = data;
+      }
     }
 
-    return res.status(201).json({ success: true, data });
-  } catch (error: any) {
-    console.error("POST /api/interview/response error:", error);
+    // Voice transcripts are stored verbatim; option taps keep the values
+    // the frontend sent. The schema has no response_type column, so the
+    // frontend-provided text is authoritative in both cases.
+    const storedAnswer = answerText;
 
+    const { data: existing } = await supabase
+      .from("interview_responses")
+      .select("id")
+      .eq("session_id", session.id)
+      .eq("question_key", qkey)
+      .maybeSingle();
+
+    let saved: any;
+    if (existing?.id) {
+      const { data, error } = await supabase
+        .from("interview_responses")
+        .update({ answer: storedAnswer })
+        .eq("id", existing.id)
+        .select()
+        .single();
+      if (error) throw dbError(error, "Updating the interview response");
+      saved = data;
+    } else {
+      const { data, error } = await supabase
+        .from("interview_responses")
+        .insert([{ session_id: session.id, question_key: qkey, answer: storedAnswer }])
+        .select()
+        .single();
+      if (error) throw dbError(error, "Saving the interview response");
+      saved = data;
+    }
+
+    return res.status(201).json({ success: true, data: saved, sessionId: session.id });
+  } catch (error: any) {
+    console.error("POST /api/interview/response error:", error?.message || error);
     return res.status(500).json({
       success: false,
       error: error.message || "Failed to save interview response",
@@ -290,18 +648,51 @@ app.post("/api/interview/response", async (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------
-// 4c. GENERATE + STORE DOCTOR SUMMARY (always English)
+// 4d. LIST INTERVIEW RESPONSES FOR A SESSION (verification)
+// ---------------------------------------------------------
+
+app.get("/api/interview/session/:id/responses", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    if (!isUuid(id)) {
+      return res.status(400).json({ success: false, error: "A valid session UUID is required" });
+    }
+
+    const { data, error } = await supabase
+      .from("interview_responses")
+      .select("*")
+      .eq("session_id", id)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    return res.json({ success: true, data: data || [] });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: error.message || "Failed to list interview responses",
+    });
+  }
+});
+
+// ---------------------------------------------------------
+// 4e. GENERATE + STORE DOCTOR SUMMARY (always English).
+// Persisted in clinical_summaries { patient_id, session_id, summary
+// (jsonb) } — the table that actually exists for this purpose.
 // ---------------------------------------------------------
 
 app.post("/api/summary/doctor", async (req: Request, res: Response) => {
   try {
     const body = req.body || {};
 
-    const patientId = body.patientId;
-    if (!patientId) {
+    const patientId = body.patientId || body.patient_id;
+    if (!isUuid(patientId)) {
       return res.status(400).json({
         success: false,
-        error: "patientId is required",
+        error: "A valid patient UUID is required",
       });
     }
 
@@ -321,9 +712,16 @@ app.post("/api/summary/doctor", async (req: Request, res: Response) => {
     // The doctor summary language is enforced here, server-side, and is never
     // derived from the patient's selected language.
     const englishSummary = generateDoctorEnglishSummary(payload);
-    const finalSummary = openai
-      ? await enhanceWithAi(payload, openai as any)
-      : englishSummary;
+    // AI enhancement is best-effort: a bad/missing key must NEVER prevent
+    // the deterministic summary from being stored and returned.
+    let finalSummary = englishSummary;
+    if (openai) {
+      try {
+        finalSummary = await enhanceWithAi(payload, openai as any);
+      } catch (aiError: any) {
+        console.warn("AI summary enhancement failed, using deterministic summary:", aiError?.message || aiError);
+      }
+    }
 
     const doctorSummary = {
       language: "en" as const,
@@ -335,30 +733,43 @@ app.post("/api/summary/doctor", async (req: Request, res: Response) => {
       content: Array.isArray(body.patientSummaryRows) ? body.patientSummaryRows : [],
     };
 
-    // Persist BOTH representations as additional derived rows in the existing
-    // interview_responses table. Original patient responses are never touched.
-    const { error: doctorError } = await supabase
-      .from("interview_responses")
+    // Persist ONE clinical_summaries row for this patient/session.
+    // clinical_summaries.summary is jsonb: pass the OBJECT, never a
+    // pre-stringified string (the client must not double-stringify).
+    const summaryPayload = {
+      patientLanguage: payload.patientLanguage,
+      careMode: payload.careMode,
+      shareScope: payload.shareScope,
+      patientSummary,
+      doctorSummary,
+      generatedAt: new Date().toISOString(),
+    };
+
+    let sessionId: string | null = null;
+    try {
+      const open = await openSessionFor(patientId);
+      sessionId = (open?.id as string) || null;
+    } catch {
+      sessionId = null;
+    }
+
+    const { data: summaryRow, error: summaryError } = await supabase
+      .from("clinical_summaries")
       .insert([
         {
           patient_id: patientId,
-          question_id: PATIENT_SUMMARY_QUESTION_ID,
-          response_text: JSON.stringify({ language: payload.patientLanguage, content: patientSummary.content }),
-          response_type: PATIENT_SUMMARY_RESPONSE_TYPE,
+          session_id: sessionId,
+          summary: summaryPayload,
         },
-        {
-          patient_id: patientId,
-          question_id: DOCTOR_SUMMARY_QUESTION_ID,
-          response_text: JSON.stringify(doctorSummary.content),
-          response_type: DOCTOR_SUMMARY_RESPONSE_TYPE,
-        },
-      ]);
+      ])
+      .select()
+      .single();
 
-    if (doctorError) {
-      console.error("Doctor summary storage error:", doctorError.message);
+    if (summaryError) {
+      console.error("Doctor summary storage error:", summaryError.message);
       return res.status(500).json({
         success: false,
-        error: doctorError.message || "Failed to store summary",
+        error: summaryError.message || "Failed to store summary",
         doctorSummary,
       });
     }
@@ -366,6 +777,7 @@ app.post("/api/summary/doctor", async (req: Request, res: Response) => {
     return res.status(201).json({
       success: true,
       patientId,
+      summaryId: summaryRow.id,
       patientLanguage: payload.patientLanguage,
       patientSummary,
       doctorSummary,
@@ -383,56 +795,44 @@ app.post("/api/summary/doctor", async (req: Request, res: Response) => {
 app.get("/api/summary/doctor/:patientId", async (req: Request, res: Response) => {
   try {
     const { patientId } = req.params;
+
+    if (!isUuid(patientId)) {
+      return res.status(400).json({ success: false, error: "A valid patient UUID is required" });
+    }
+
     const { data, error } = await supabase
-      .from("interview_responses")
+      .from("clinical_summaries")
       .select("*")
       .eq("patient_id", patientId)
-      .in("question_id", [DOCTOR_SUMMARY_QUESTION_ID, PATIENT_SUMMARY_QUESTION_ID])
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
     if (error) {
       console.error("Doctor summary fetch error:", error.message);
       return res.status(500).json({ success: false, error: error.message });
     }
 
-    const doctorRow = (data || []).find((r) => r.question_id === DOCTOR_SUMMARY_QUESTION_ID);
-    const patientRow = (data || []).find((r) => r.question_id === PATIENT_SUMMARY_QUESTION_ID);
-
-    if (!doctorRow) {
+    if (!data?.summary) {
       return res.status(404).json({
         success: false,
         error: "No shared summary found for this patient",
       });
     }
 
-    let content: any = doctorRow.response_text;
-    try {
-      content = JSON.parse(doctorRow.response_text);
-    } catch {
-      content = { text: content };
-    }
-
-    let patientContent: any = null;
-    if (patientRow) {
-      try {
-        patientContent = JSON.parse(patientRow.response_text);
-      } catch {
-        patientContent = { language: "en", content: [] };
-      }
-    }
+    const stored = data.summary as {
+      patientLanguage?: string;
+      patientSummary?: { language: string; content: unknown[] };
+      doctorSummary?: { language: string; content: unknown };
+    };
 
     return res.json({
       success: true,
       patientId,
-      patientLanguage: content?.patientLanguage || "en",
-      patientSummary: {
-        language: patientContent?.language || "en",
-        content: patientContent?.content ?? [],
-      },
-      doctorSummary: {
-        language: "en",
-        content,
-      },
+      summaryId: data.id,
+      patientLanguage: stored.patientLanguage || "en",
+      patientSummary: stored.patientSummary || { language: "en", content: [] },
+      doctorSummary: stored.doctorSummary || { language: "en", content: null },
     });
   } catch (error: any) {
     console.error("GET /api/summary/doctor/:patientId error:", error?.message || error);
@@ -604,6 +1004,145 @@ app.post(
     }
   }
 );
+
+// ---------------------------------------------------------
+// 6. READ ENDPOINTS CONSUMED BY THE KIOSK + STAFF SCREENS
+// ---------------------------------------------------------
+
+app.get("/api/intake/:patientId", async (req: Request, res: Response) => {
+  try {
+    const { patientId } = req.params;
+    if (!isUuid(patientId)) {
+      return res.status(400).json({ success: false, error: "A valid patient UUID is required" });
+    }
+    const { data, error } = await supabase
+      .from("intake")
+      .select("*")
+      .eq("patient_id", patientId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) return res.status(500).json({ success: false, error: error.message });
+    if (!data) return res.status(404).json({ success: false, error: "No intake found" });
+    return res.json(data);
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message || "Failed to fetch intake" });
+  }
+});
+
+// Health timeline: newest medical documents + legacy documents first.
+app.get("/api/timeline/:patientId", async (req: Request, res: Response) => {
+  try {
+    const { patientId } = req.params;
+    if (!isUuid(patientId)) {
+      return res.status(400).json({ success: false, error: "A valid patient UUID is required" });
+    }
+    const [docs, legacy] = await Promise.all([
+      supabase.from("medical_documents").select("*").eq("patient_id", patientId).order("created_at", { ascending: false }),
+      supabase.from("documents").select("*").eq("patient_id", patientId).order("created_at", { ascending: false }),
+    ]);
+    if (docs.error) return res.status(500).json({ success: false, error: docs.error.message });
+    const items = [
+      ...((docs.data || []).map((d: any) => ({
+        id: d.id,
+        date: (d.created_at || "").slice(0, 10),
+        event: d.document_type || "document",
+        description: d.original_file_name || d.document_type || "Medical document",
+      }))),
+      ...(((legacy.error ? [] : legacy.data) || []).map((d: any) => ({
+        id: d.id,
+        date: d.document_date || (d.created_at || "").slice(0, 10),
+        event: d.document_type || "document",
+        description: (d.ocr_text || "").slice(0, 140) || "Medical document",
+      }))),
+    ];
+    return res.json(items);
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message || "Failed to fetch timeline" });
+  }
+});
+
+// Staff queue: latest registered patients.
+app.get("/api/staff/patients", async (_req: Request, res: Response) => {
+  try {
+    const { data, error } = await supabase
+      .from("patients")
+      .select("id, patient_code, name, age, gender, created_at")
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) return res.status(500).json({ success: false, error: error.message });
+    return res.json(data || []);
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message || "Failed to list patients" });
+  }
+});
+
+app.get("/api/staff/patients/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!isUuid(id)) {
+      return res.status(400).json({ success: false, error: "A valid patient UUID is required" });
+    }
+    const { data, error } = await supabase.from("patients").select("*").eq("id", id).maybeSingle();
+    if (error) return res.status(500).json({ success: false, error: error.message });
+    if (!data) return res.status(404).json({ success: false, error: "Patient not found" });
+    return res.json(data);
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message || "Failed to fetch patient" });
+  }
+});
+
+// Documents for a patient (new medical_documents table, mapped to the
+// DocumentRecord shape the kiosk screens consume).
+app.get("/api/documents/:patientId", async (req: Request, res: Response) => {
+  try {
+    const { patientId } = req.params;
+    if (!isUuid(patientId)) {
+      return res.status(400).json({ success: false, error: "A valid patient UUID is required" });
+    }
+    const { data, error } = await supabase
+      .from("medical_documents")
+      .select("*")
+      .eq("patient_id", patientId)
+      .order("created_at", { ascending: false });
+    if (error) return res.status(500).json({ success: false, error: error.message });
+    return res.json(
+      (data || []).map((d: any) => ({
+        id: d.id,
+        patient_id: d.patient_id,
+        file_path: d.storage_path,
+        original_file_path: d.storage_path,
+        raw_ocr_text: d.extracted_text || "",
+        structured_data: null,
+        preprocessing_info: {},
+        status: d.processing_status || "processed",
+        created_at: d.created_at,
+      }))
+    );
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message || "Failed to list documents" });
+  }
+});
+
+// Legacy documents verification flag.
+app.post("/api/documents/:id/verify", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!isUuid(id)) {
+      return res.status(400).json({ success: false, error: "A valid document UUID is required" });
+    }
+    const { data, error } = await supabase
+      .from("documents")
+      .update({ processed: true })
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) return res.status(400).json({ success: false, error: error.message });
+    return res.json({ success: true, data });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message || "Failed to verify document" });
+  }
+});
 
 // ---------------------------------------------------------
 // SERVER

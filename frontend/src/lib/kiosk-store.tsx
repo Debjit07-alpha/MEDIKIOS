@@ -12,9 +12,14 @@ import { setSpeechLocale } from "./speech";
 import { KioskContext } from "./kiosk-context";
 
 export type Patient = {
+  /** Canonical identifier: the patients.id UUID created at registration.
+   *  EVERY patient-specific backend call must use this value.
+   *  Empty string until the backend confirms creation. */
+  id: string;
   name: string;
   age: number;
   sex: string;
+  /** Display label (hospital UHID / patient code). Never used as a key. */
   uhid: string;
   route: "abha" | "aadhaar" | "new";
 };
@@ -30,7 +35,11 @@ type KioskState = {
   identityMethod: "abha" | "aadhaar" | "new" | null;
   abhaNumber: string;
   consent: boolean;
+  consentSynced: boolean;
   patient: Patient | null;
+  /** Canonical interview_sessions.id for the active visit. Created once
+   *  when Questions starts, reused for every answer + document. */
+  sessionId: string | null;
   careMode: CareMode | null;
   answers: Record<string, string[]>;
   voiceAnswers: Record<string, string>;
@@ -45,7 +54,9 @@ const initialState: KioskState = {
   identityMethod: null,
   abhaNumber: "",
   consent: false,
+  consentSynced: false,
   patient: null,
+  sessionId: null,
   careMode: null,
   answers: {},
   voiceAnswers: {},
@@ -61,7 +72,9 @@ export type KioskContextValue = KioskState & {
   clearIdentityMethod: () => void;
   setAbhaNumber: (number: string) => void;
   giveConsent: () => void;
+  markConsentSynced: () => void;
   setPatient: (patient: Patient) => void;
+  setSessionId: (sessionId: string | null) => void;
   setCareMode: (mode: CareMode) => void;
   answer: (questionId: string, values: string[]) => void;
   voiceAnswer: (questionId: string, transcript: string) => void;
@@ -125,7 +138,9 @@ export function KioskProvider({ children }: { children: ReactNode }) {
       clearIdentityMethod: () => patch({ identityMethod: null }),
       setAbhaNumber: (abhaNumber) => patch({ abhaNumber }),
       giveConsent: () => patch({ consent: true }),
-      setPatient: (patient) => patch({ patient }),
+      markConsentSynced: () => patch({ consentSynced: true }),
+      setPatient: (patient) => patch({ patient, sessionId: null, consentSynced: false }),
+      setSessionId: (sessionId) => patch({ sessionId }),
       setCareMode: (careMode) => patch({ careMode }),
       answer: (questionId, values) =>
         setState((prev) => ({ ...prev, answers: { ...prev.answers, [questionId]: values } })),

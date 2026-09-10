@@ -2,11 +2,16 @@ const API_URL = import.meta.env["VITE_API_URL"] || "http://localhost:5000";
 
 export interface Patient {
   id: string;
+  patient_code?: string | null;
   name: string;
   age: number;
   gender: string;
+  phone?: string | null;
+  phone_number?: string | null;
   abha_number?: string;
   aadhaar_id?: string;
+  date_of_birth?: string | null;
+  preferred_language?: string | null;
   uhid?: string;
 }
 
@@ -84,6 +89,7 @@ export interface IntakeData {
 
 export interface InterviewResponseInput {
   patientId: string;
+  sessionId?: string | null;
   questionId: string;
   responseText: string;
   responseType: string;
@@ -267,53 +273,31 @@ export const api = {
   patients: {
     get: (id: string) => request<Patient>(`/api/patients/${id}`),
 
-    identify: async (body: { method: string; value: string }): Promise<Patient> => {
-      try {
-        return await request<Patient>("/api/patients/identify", {
-          method: "POST",
-          body: JSON.stringify(body),
-        });
-      } catch (err) {
-        console.warn("API identify call failed, using kiosk offline demo record:", err);
-        if (body.method === "abha") {
-          return {
-            id: `DGH-${body.value.slice(-4)}`,
-            name: "Ramesh Kumar",
-            age: 52,
-            gender: "Male",
-            abha_number: body.value,
-            uhid: "DGH/2026/8421",
-          };
-        }
-        if (body.method === "aadhaar") {
-          return {
-            id: "DGH/2026/8421",
-            name: "Sunita Devi (Demo)",
-            age: 58,
-            gender: "Female",
-            aadhaar_id: "demo-fingerprint",
-            uhid: "DGH/2026/8421",
-          };
-        }
-        throw err;
-      }
-    },
+    update: (id: string, patch: Partial<Patient>) =>
+      request<Patient>(`/api/patients/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(patch),
+      }),
+
+    identify: (body: { method: string; value: string }): Promise<Patient> =>
+      request<Patient>("/api/patients/identify", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
 
     create: async (body: Partial<Patient>): Promise<Patient> => {
-      try {
-        return await request<Patient>("/api/patients", {
+      const created = await request<Patient | { success: boolean; data: Patient }>(
+        "/api/patients",
+        {
           method: "POST",
           body: JSON.stringify(body),
-        });
-      } catch (err) {
-        console.warn("API create patient failed, using kiosk offline record:", err);
-        return {
-          id: `DGH/2026/${Math.floor(1000 + Math.random() * 9000)}`,
-          name: body.name || "New Patient",
-          age: body.age || 40,
-          gender: body.gender || "Other",
-        };
+        },
+      );
+      // Backend returns the created row directly; tolerate a wrapped shape.
+      if (created && typeof created === "object" && "data" in created) {
+        return (created as { data: Patient }).data;
       }
+      return created as Patient;
     },
   },
 
@@ -328,8 +312,43 @@ export const api = {
   },
 
   interview: {
+    ensureSession: (body: { patientId: string; careMode?: string | null }) =>
+      request<{ success: boolean; reused: boolean; data: { id: string } }>(
+        "/api/interview/session",
+        {
+          method: "POST",
+          body: JSON.stringify(body),
+        },
+      ),
+
+    completeSession: (sessionId: string) =>
+      request<{ success: boolean }>(`/api/interview/session/${sessionId}/complete`, {
+        method: "POST",
+      }),
+
+    listResponses: (sessionId: string) =>
+      request<{ success: boolean; data: unknown[] }>(
+        `/api/interview/session/${sessionId}/responses`,
+      ),
+
     saveResponse: (body: InterviewResponseInput) =>
-      request<{ success: boolean }>("/api/interview/response", {
+      request<{ success: boolean; sessionId: string }>("/api/interview/response", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+  },
+
+  consents: {
+    save: (body: { patientId: string; purpose?: string; consentGiven?: boolean }) =>
+      request<{ success: boolean }>("/api/consents", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+  },
+
+  consultations: {
+    create: (body: { patientId: string; status?: string }) =>
+      request<{ success: boolean }>("/api/consultations", {
         method: "POST",
         body: JSON.stringify(body),
       }),
@@ -378,6 +397,7 @@ export const api = {
 
     saveDocument: async (input: {
       patientId: string;
+      sessionId?: string | null;
       file: File;
       saveKey: string;
       documentType: OcrDocumentType;
@@ -389,6 +409,7 @@ export const api = {
       const formData = new FormData();
       formData.append("file", input.file);
       formData.append("patientId", input.patientId);
+      if (input.sessionId) formData.append("sessionId", input.sessionId);
       formData.append("saveKey", input.saveKey);
       formData.append("documentType", input.documentType);
       formData.append("rawOcrText", input.rawOcrText);
