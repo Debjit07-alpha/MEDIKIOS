@@ -70,6 +70,85 @@ const copy: Partial<Record<LanguageCode, Record<string, QuestionCopy>>> = {
         none: { label: "इनमें से कुछ नहीं" },
       },
     },
+    past_history: {
+      prompt: "क्या किसी डॉक्टर ने आपको बताया है कि आपको इनमें से कोई बीमारी है?",
+      section: "पिछली बीमारी",
+      fieldLabel: "पिछली चिकित्सा और ऑपरेशन का इतिहास",
+      options: {
+        dm: { label: "शुगर (मधुमेह)" },
+        htn: { label: "ब्लड प्रेशर" },
+        asthma: { label: "दमा" },
+        tb: { label: "पहले कभी टीबी" },
+        surgery: { label: "पहले कोई ऑपरेशन" },
+        none: { label: "इनमें से कुछ नहीं" },
+      },
+    },
+    drug_history: {
+      prompt: "क्या आप रोज कोई दवा लेते हैं?",
+      section: "दवा और एलर्जी",
+      fieldLabel: "दवा का इतिहास",
+      options: {
+        yes_regular: { label: "हां, रोज" },
+        sometimes: { label: "केवल कभी-कभी" },
+        no: { label: "कोई दवा नहीं" },
+      },
+    },
+    allergy: {
+      prompt: "क्या किसी दवा से कभी दाने, सूजन या सांस फूलने की तकलीफ हुई है?",
+      section: "दवा और एलर्जी",
+      fieldLabel: "एलर्जी का इतिहास",
+      options: {
+        penicillin: { label: "हां, दर्द या बुखार की दवा से" },
+        other: { label: "हां, पर नाम नहीं पता" },
+        no: { label: "नहीं, कभी नहीं" },
+      },
+    },
+    family_history: {
+      prompt: "आपके परिवार में क्या किसी को ये बीमारियां हैं?",
+      section: "पारिवारिक इतिहास",
+      fieldLabel: "पारिवारिक इतिहास",
+      options: {
+        dm: { label: "शुगर" },
+        htn: { label: "ब्लड प्रेशर" },
+        heart: { label: "दिल की बीमारी" },
+        cancer: { label: "कैंसर" },
+        none: { label: "किसी को नहीं" },
+      },
+    },
+    personal_history: {
+      prompt: "क्या आप तंबाकू, बीड़ी, सिगरेट या शराब लेते हैं?",
+      section: "व्यक्तिगत इतिहास",
+      fieldLabel: "व्यक्तिगत इतिहास",
+      options: {
+        tobacco: { label: "चबाने वाला तंबाकू" },
+        smoke: { label: "बीड़ी या सिगरेट" },
+        alcohol: { label: "शराब" },
+        none: { label: "कुछ नहीं" },
+      },
+    },
+    ros: {
+      prompt: "पिछले एक महीने में क्या आपने इनमें से कुछ देखा है?",
+      section: "अंगों की समीक्षा",
+      fieldLabel: "अंगों की समीक्षा",
+      options: {
+        weight: { label: "वजन घटना" },
+        appetite: { label: "भूख कम लगना" },
+        urine: { label: "बार-बार पेशाब आना" },
+        sleep: { label: "नींद ठीक न आना" },
+        swelling: { label: "पैरों में सूजन" },
+        none: { label: "ऐसा कुछ नहीं" },
+      },
+    },
+    prior_investigations: {
+      prompt: "क्या हाल में आपकी कोई खून जांच या स्कैन हुआ है?",
+      section: "पिछली जांच",
+      fieldLabel: "पिछली जांच",
+      options: {
+        blood: { label: "हां, खून जांच" },
+        scan: { label: "हां, एक्स-रे या स्कैन" },
+        no: { label: "कोई जांच नहीं हुई" },
+      },
+    },
     prakriti: {
       prompt: "बचपन से आपका शरीर प्रायः कैसा रहा है?",
       section: "प्रकृति",
@@ -252,6 +331,85 @@ const copy: Partial<Record<LanguageCode, Record<string, QuestionCopy>>> = {
         unconscious: { label: "অজ্ঞান হয়ে গিয়েছিলেন" },
         speech: { label: "শরীরের এক পাশে হঠাৎ দুর্বলতা" },
         none: { label: "এর কোনোটিই নয়" },
+      },
+    },
+    past_history: {
+      prompt: "ডাক্তার কি আপনাকে বলেছেন যে আপনার এগুলোর কোনোটি আছে?",
+      section: "আগের অসুস্থতা",
+      fieldLabel: "আগের চিকিৎসা ও অপারেশনের ইতিহাস",
+      options: {
+        dm: { label: "সুগার (ডায়াবেটিস)" },
+        htn: { label: "ব্লাড প্রেশার" },
+        asthma: { label: "হাঁপানি" },
+        tb: { label: "আগে কখনো টিবি" },
+        surgery: { label: "আগে কোনো অপারেশন" },
+        none: { label: "এর কোনোটিই নয়" },
+      },
+    },
+    drug_history: {
+      prompt: "আপনি কি প্রতিদিন কোনো ওষুধ খান?",
+      section: "ওষুধ ও অ্যালার্জি",
+      fieldLabel: "ওষুধের ইতিহাস",
+      options: {
+        yes_regular: { label: "হ্যাঁ, প্রতিদিন" },
+        sometimes: { label: "শুধু মাঝে মাঝে" },
+        no: { label: "কোনো ওষুধ নয়" },
+      },
+    },
+    allergy: {
+      prompt: "কোনো ওষুধে কি কখনো ফুসকুড়ি, ফোলা বা শ্বাসকষ্ট হয়েছে?",
+      section: "ওষুধ ও অ্যালার্জি",
+      fieldLabel: "অ্যালার্জির ইতিহাস",
+      options: {
+        penicillin: { label: "হ্যাঁ, ব্যথা বা জ্বরের ওষুধে" },
+        other: { label: "হ্যাঁ, কিন্তু নাম জানি না" },
+        no: { label: "না, কখনো নয়" },
+      },
+    },
+    family_history: {
+      prompt: "আপনার পরিবারে কি কারো এই অসুখগুলো আছে?",
+      section: "পারিবারিক ইতিহাস",
+      fieldLabel: "পারিবারিক ইতিহাস",
+      options: {
+        dm: { label: "সুগার" },
+        htn: { label: "ব্লাড প্রেশার" },
+        heart: { label: "হার্টের সমস্যা" },
+        cancer: { label: "ক্যান্সার" },
+        none: { label: "কারো নেই" },
+      },
+    },
+    personal_history: {
+      prompt: "আপনি কি তামাক, বিড়ি, সিগারেট বা মদ খান?",
+      section: "ব্যক্তিগত ইতিহাস",
+      fieldLabel: "ব্যক্তিগত ইতিহাস",
+      options: {
+        tobacco: { label: "চিবানোর তামাক" },
+        smoke: { label: "বিড়ি বা সিগারেট" },
+        alcohol: { label: "মদ" },
+        none: { label: "কিছুই নয়" },
+      },
+    },
+    ros: {
+      prompt: "গত এক মাসে কি এগুলোর কোনোটি লক্ষ্য করেছেন?",
+      section: "শরীরের পর্যালোচনা",
+      fieldLabel: "শরীরের পর্যালোচনা",
+      options: {
+        weight: { label: "ওজন কমে যাওয়া" },
+        appetite: { label: "ক্ষুধা কম লাগা" },
+        urine: { label: "বারবার প্রস্রাব হওয়া" },
+        sleep: { label: "ঘুম ঠিকমতো না হওয়া" },
+        swelling: { label: "পায়ে ফোলা" },
+        none: { label: "এরকম কিছুই নয়" },
+      },
+    },
+    prior_investigations: {
+      prompt: "সম্প্রতি কি আপনার কোনো রক্ত পরীক্ষা বা স্ক্যান হয়েছে?",
+      section: "আগের পরীক্ষা",
+      fieldLabel: "আগের পরীক্ষা",
+      options: {
+        blood: { label: "হ্যাঁ, রক্ত পরীক্ষা" },
+        scan: { label: "হ্যাঁ, এক্স-রে বা স্ক্যান" },
+        no: { label: "কোনো পরীক্ষা হয়নি" },
       },
     },
     prakriti: {
@@ -438,6 +596,85 @@ const copy: Partial<Record<LanguageCode, Record<string, QuestionCopy>>> = {
         none: { label: "यापैकी काहीही नाही" },
       },
     },
+    past_history: {
+      prompt: "डॉक्टरांनी तुम्हाला सांगितले आहे का की तुम्हाला यांपैकी काही आजार आहे?",
+      section: "मागील आजार",
+      fieldLabel: "मागील उपचार व शस्त्रक्रियांचा इतिहास",
+      options: {
+        dm: { label: "साखर (मधुमेह)" },
+        htn: { label: "रक्तदाब" },
+        asthma: { label: "दमा" },
+        tb: { label: "पूर्वी कधी टीबी" },
+        surgery: { label: "पूर्वी कोणतेही ऑपरेशन" },
+        none: { label: "यांपैकी काही नाही" },
+      },
+    },
+    drug_history: {
+      prompt: "तुम्ही रोज कोणतेही औषध घेता का?",
+      section: "औषधे व ऍलर्जी",
+      fieldLabel: "औषधांचा इतिहास",
+      options: {
+        yes_regular: { label: "होय, रोज" },
+        sometimes: { label: "फक्त कधीकधी" },
+        no: { label: "कोणतेही औषध नाही" },
+      },
+    },
+    allergy: {
+      prompt: "कोणत्याही औषधामुळे कधी पुरळ, सूज किंवा धाप लागली आहे का?",
+      section: "औषधे व ऍलर्जी",
+      fieldLabel: "ऍलर्जीचा इतिहास",
+      options: {
+        penicillin: { label: "होय, दुखणे किंवा तापाच्या औषधामुळे" },
+        other: { label: "होय, पण नाव माहित नाही" },
+        no: { label: "नाही, कधीही नाही" },
+      },
+    },
+    family_history: {
+      prompt: "तुमच्या कुटुंबात कोणाला हे आजार आहेत का?",
+      section: "कौटुंबिक इतिहास",
+      fieldLabel: "कौटुंबिक इतिहास",
+      options: {
+        dm: { label: "साखर" },
+        htn: { label: "रक्तदाब" },
+        heart: { label: "हृदयाचा त्रास" },
+        cancer: { label: "कर्करोग" },
+        none: { label: "कोणालाही नाही" },
+      },
+    },
+    personal_history: {
+      prompt: "तुम्ही तंबाखू, बिडी, सिगारेट किंवा दारू घेता का?",
+      section: "वैयक्तिक इतिहास",
+      fieldLabel: "वैयक्तिक इतिहास",
+      options: {
+        tobacco: { label: "चघळण्याचा तंबाखू" },
+        smoke: { label: "बिडी किंवा सिगारेट" },
+        alcohol: { label: "दारू" },
+        none: { label: "काहीही नाही" },
+      },
+    },
+    ros: {
+      prompt: "गेल्या एक महिन्यात तुम्हाला यांपैकी काही जाणवले का?",
+      section: "शरीराची तपासणी",
+      fieldLabel: "शरीराची तपासणी",
+      options: {
+        weight: { label: "वजन कमी होणे" },
+        appetite: { label: "भूक कमी लागणे" },
+        urine: { label: "वारंवार लघवी होणे" },
+        sleep: { label: "झोप नीट न लागणे" },
+        swelling: { label: "पायांना सूज" },
+        none: { label: "असे काहीही नाही" },
+      },
+    },
+    prior_investigations: {
+      prompt: "अलीकडे तुमची रक्ततपासणी किंवा स्कॅन झाला आहे का?",
+      section: "मागील तपासण्या",
+      fieldLabel: "मागील तपासण्या",
+      options: {
+        blood: { label: "होय, रक्ततपासणी" },
+        scan: { label: "होय, एक्स-रे किंवा स्कॅन" },
+        no: { label: "कोणतीही तपासणी झालेली नाही" },
+      },
+    },
     prakriti: {
       prompt: "लहानपणापासून तुमचा शरीरप्रकृती कशा प्रकारची आहे?",
       section: "प्रकृती",
@@ -620,6 +857,85 @@ const copy: Partial<Record<LanguageCode, Record<string, QuestionCopy>>> = {
         unconscious: { label: "மயக்கம் அடைந்தீர்கள்" },
         speech: { label: "உடலின் ஒரு பக்கம் திடீரென பலவீனம்" },
         none: { label: "இவை எதுவும் இல்லை" },
+      },
+    },
+    past_history: {
+      prompt: "இவற்றில் ஏதேனும் நோய் உங்களுக்கு இருப்பதாக மருத்துவர் கூறியுள்ளாரா?",
+      section: "முந்தைய நோய்",
+      fieldLabel: "முந்தைய மருத்துவ மற்றும் அறுவை சிகிச்சை வரலாறு",
+      options: {
+        dm: { label: "சர்க்கரை (நீரிழிவு)" },
+        htn: { label: "இரத்த அழுத்தம்" },
+        asthma: { label: "ஆஸ்துமா" },
+        tb: { label: "முன்பு காசநோய்" },
+        surgery: { label: "முன்பு அறுவை சிகிச்சை" },
+        none: { label: "இவற்றில் எதுவும் இல்லை" },
+      },
+    },
+    drug_history: {
+      prompt: "தினமும் ஏதேனும் மருந்து சாப்பிடுகிறீர்களா?",
+      section: "மருந்து மற்றும் ஒவ்வாமை",
+      fieldLabel: "மருந்து வரலாறு",
+      options: {
+        yes_regular: { label: "ஆம், தினமும்" },
+        sometimes: { label: "எப்போதாவது மட்டும்" },
+        no: { label: "மருந்து இல்லை" },
+      },
+    },
+    allergy: {
+      prompt: "ஏதேனும் மருந்தால் தடிப்பு, வீக்கம் அல்லது மூச்சுத் திணறல் ஏற்பட்டதா?",
+      section: "மருந்து மற்றும் ஒவ்வாமை",
+      fieldLabel: "ஒவ்வாமை வரலாறு",
+      options: {
+        penicillin: { label: "ஆம், வலி அல்லது காய்ச்சல் மருந்தால்" },
+        other: { label: "ஆம், ஆனால் பெயர் தெரியாது" },
+        no: { label: "இல்லை, ஒருபோதும் இல்லை" },
+      },
+    },
+    family_history: {
+      prompt: "உங்கள் குடும்பத்தில் யாருக்கேனும் இந்த நோய்கள் உள்ளனவா?",
+      section: "குடும்ப வரலாறு",
+      fieldLabel: "குடும்ப வரலாறு",
+      options: {
+        dm: { label: "சர்க்கரை" },
+        htn: { label: "இரத்த அழுத்தம்" },
+        heart: { label: "இதய பிரச்சனை" },
+        cancer: { label: "புற்றுநோய்" },
+        none: { label: "யாருக்கும் இல்லை" },
+      },
+    },
+    personal_history: {
+      prompt: "புகையிலை, பீடி, சிகரெட் அல்லது மது அருந்துகிறீர்களா?",
+      section: "தனிப்பட்ட வரலாறு",
+      fieldLabel: "தனிப்பட்ட வரலாறு",
+      options: {
+        tobacco: { label: "மெல்லும் புகையிலை" },
+        smoke: { label: "பீடி அல்லது சிகரெட்" },
+        alcohol: { label: "மது" },
+        none: { label: "எதுவும் இல்லை" },
+      },
+    },
+    ros: {
+      prompt: "கடந்த ஒரு மாதத்தில் இவற்றில் ஏதேனும் கவனித்தீர்களா?",
+      section: "உடல் பரிசோதனை",
+      fieldLabel: "உடல் பரிசோதனை",
+      options: {
+        weight: { label: "எடை குறைதல்" },
+        appetite: { label: "பசி குறைதல்" },
+        urine: { label: "அடிக்கடி சிறுநீர்" },
+        sleep: { label: "தூக்கமின்மை" },
+        swelling: { label: "கால்களில் வீக்கம்" },
+        none: { label: "இப்படி எதுவும் இல்லை" },
+      },
+    },
+    prior_investigations: {
+      prompt: "சமீபத்தில் இரத்த பரிசோதனை அல்லது ஸ்கேன் செய்தீர்களா?",
+      section: "முந்தைய பரிசோதனைகள்",
+      fieldLabel: "முந்தைய பரிசோதனைகள்",
+      options: {
+        blood: { label: "ஆம், இரத்த பரிசோதனை" },
+        scan: { label: "ஆம், எக்ஸ்-ரே அல்லது ஸ்கேன்" },
+        no: { label: "பரிசோதனை செய்யவில்லை" },
       },
     },
     prakriti: {
@@ -806,6 +1122,85 @@ const copy: Partial<Record<LanguageCode, Record<string, QuestionCopy>>> = {
         none: { label: "వీటిలో ఏదీ లేదు" },
       },
     },
+    past_history: {
+      prompt: "వీటిలో ఏదైనా జబ్బు మీకు ఉందని డాక్టర్ చెప్పారా?",
+      section: "గత జబ్బులు",
+      fieldLabel: "గత వైద్య మరియు ఆపరేషన్ల చరిత్ర",
+      options: {
+        dm: { label: "షుగర్ (మధుమేహం)" },
+        htn: { label: "బీపీ" },
+        asthma: { label: "ఆస్తమా" },
+        tb: { label: "గతంలో టీబీ" },
+        surgery: { label: "గతంలో ఏదైనా ఆపరేషన్" },
+        none: { label: "వీటిలో ఏదీ లేదు" },
+      },
+    },
+    drug_history: {
+      prompt: "మీరు ప్రతిరోజూ ఏదైనా మందు వాడుతున్నారా?",
+      section: "మందులు & అలెర్జీ",
+      fieldLabel: "మందుల చరిత్ర",
+      options: {
+        yes_regular: { label: "అవును, ప్రతిరోజూ" },
+        sometimes: { label: "అప్పుడప్పుడు మాత్రమే" },
+        no: { label: "మందులు లేవు" },
+      },
+    },
+    allergy: {
+      prompt: "ఏదైనా మందు వల్ల దద్దుర్లు, వాపు లేదా ఆయాసం వచ్చిందా?",
+      section: "మందులు & అలెర్జీ",
+      fieldLabel: "అలెర్జీ చరిత్ర",
+      options: {
+        penicillin: { label: "అవును, నొప్పి లేదా జ్వరం మందు వల్ల" },
+        other: { label: "అవును, కానీ పేరు తెలియదు" },
+        no: { label: "లేదు, ఎప్పుడూ లేదు" },
+      },
+    },
+    family_history: {
+      prompt: "మీ కుటుంబంలో ఎవరికైనా ఈ జబ్బులు ఉన్నాయా?",
+      section: "కుటుంబ చరిత్ర",
+      fieldLabel: "కుటుంబ చరిత్ర",
+      options: {
+        dm: { label: "షుగర్" },
+        htn: { label: "బీపీ" },
+        heart: { label: "గుండె సమస్య" },
+        cancer: { label: "క్యాన్సర్" },
+        none: { label: "ఎవరికీ లేదు" },
+      },
+    },
+    personal_history: {
+      prompt: "మీరు పొగాకు, బీడీ, సిగరెట్ లేదా మద్యం వాడుతున్నారా?",
+      section: "వ్యక్తిగత చరిత్ర",
+      fieldLabel: "వ్యక్తిగత చరిత్ర",
+      options: {
+        tobacco: { label: "నమిలే పొగాకు" },
+        smoke: { label: "బీడీ లేదా సిగరెట్" },
+        alcohol: { label: "మద్యం" },
+        none: { label: "ఏదీ లేదు" },
+      },
+    },
+    ros: {
+      prompt: "గత నెలలో వీటిలో ఏదైనా గమనించారా?",
+      section: "శరీర పరిశీలన",
+      fieldLabel: "శరీర పరిశీలన",
+      options: {
+        weight: { label: "బరువు తగ్గడం" },
+        appetite: { label: "ఆకలి తగ్గడం" },
+        urine: { label: "తరచూ మూత్రం" },
+        sleep: { label: "సరిగా నిద్రపట్టకపోవడం" },
+        swelling: { label: "కాళ్లలో వాపు" },
+        none: { label: "ఇలాంటిదేమీ లేదు" },
+      },
+    },
+    prior_investigations: {
+      prompt: "ఇటీవల రక్త పరీక్ష లేదా స్కాన్ చేయించారా?",
+      section: "గత పరీక్షలు",
+      fieldLabel: "గత పరీక్షలు",
+      options: {
+        blood: { label: "అవును, రక్త పరీక్ష" },
+        scan: { label: "అవును, ఎక్స్-రే లేదా స్కాన్" },
+        no: { label: "పరీక్ష చేయించలేదు" },
+      },
+    },
     prakriti: {
       prompt: "చిన్నప్పటి నుంచి మీ శరీరం ఎక్కువగా ఎలా ఉంటుంది?",
       section: "ప్రకృతి",
@@ -988,6 +1383,85 @@ const copy: Partial<Record<LanguageCode, Record<string, QuestionCopy>>> = {
         unconscious: { label: "ಪ್ರಜ್ಞೆ ತಪ್ಪಿದ್ದೀರಿ" },
         speech: { label: "ದೇಹದ ಒಂದು ಬದಿಯಲ್ಲಿ ಹಠಾತ್ ದೌರ್ಬಲ್ಯ" },
         none: { label: "ಇವುಗಳಲ್ಲಿ ಯಾವುದೂ ಇಲ್ಲ" },
+      },
+    },
+    past_history: {
+      prompt: "ಇವುಗಳಲ್ಲಿ ಯಾವುದಾದರೂ ಕಾಯಿಲೆ ನಿಮಗಿದೆ ಎಂದು ವೈದ್ಯರು ಹೇಳಿದ್ದಾರೆಯೇ?",
+      section: "ಹಿಂದಿನ ಕಾಯಿಲೆ",
+      fieldLabel: "ಹಿಂದಿನ ವೈದ್ಯಕೀಯ ಮತ್ತು ಶಸ್ತ್ರಚಿಕಿತ್ಸಾ ಇತಿಹಾಸ",
+      options: {
+        dm: { label: "ಸಕ್ಕರೆ (ಮಧುಮೇಹ)" },
+        htn: { label: "ಬಿಪಿ" },
+        asthma: { label: "ಅಸ್ತಮಾ" },
+        tb: { label: "ಹಿಂದೆ ಟಿಬಿ" },
+        surgery: { label: "ಹಿಂದೆ ಯಾವುದಾದರೂ ಆಪರೇಷನ್" },
+        none: { label: "ಇವುಗಳಲ್ಲಿ ಯಾವುದೂ ಇಲ್ಲ" },
+      },
+    },
+    drug_history: {
+      prompt: "ನೀವು ಪ್ರತಿದಿನ ಯಾವುದಾದರೂ ಔಷಧಿ ತೆಗೆದುಕೊಳ್ಳುತ್ತೀರಾ?",
+      section: "ಔಷಧಿ ಮತ್ತು ಅಲರ್ಜಿ",
+      fieldLabel: "ಔಷಧಿ ಇತಿಹಾಸ",
+      options: {
+        yes_regular: { label: "ಹೌದು, ಪ್ರತಿದಿನ" },
+        sometimes: { label: "ಎಂದಾದರೂ ಮಾತ್ರ" },
+        no: { label: "ಔಷಧಿ ಇಲ್ಲ" },
+      },
+    },
+    allergy: {
+      prompt: "ಯಾವುದಾದರೂ ಔಷಧಿಯಿಂದ ದದ್ದು, ಊತ ಅಥವಾ ಉಸಿರಾಟದ ತೊಂದರೆ ಆಗಿದೆಯೇ?",
+      section: "ಔಷಧಿ ಮತ್ತು ಅಲರ್ಜಿ",
+      fieldLabel: "ಅಲರ್ಜಿ ಇತಿಹಾಸ",
+      options: {
+        penicillin: { label: "ಹೌದು, ನೋವು ಅಥವಾ ಜ್ವರದ ಔಷಧಿಯಿಂದ" },
+        other: { label: "ಹೌದು, ಆದರೆ ಹೆಸರು ಗೊತ್ತಿಲ್ಲ" },
+        no: { label: "ಇಲ್ಲ, ಎಂದಿಗೂ ಇಲ್ಲ" },
+      },
+    },
+    family_history: {
+      prompt: "ನಿಮ್ಮ ಕುಟುಂಬದಲ್ಲಿ ಯಾರಿಗಾದರೂ ಈ ಕಾಯಿಲೆಗಳಿವೆಯೇ?",
+      section: "ಕುಟುಂಬ ಇತಿಹಾಸ",
+      fieldLabel: "ಕುಟುಂಬ ಇತಿಹಾಸ",
+      options: {
+        dm: { label: "ಸಕ್ಕರೆ" },
+        htn: { label: "ಬಿಪಿ" },
+        heart: { label: "ಹೃದಯ ಸಮಸ್ಯೆ" },
+        cancer: { label: "ಕ್ಯಾನ್ಸರ್" },
+        none: { label: "ಯಾರಿಗೂ ಇಲ್ಲ" },
+      },
+    },
+    personal_history: {
+      prompt: "ನೀವು ತಂಬಾಕು, ಬೀಡಿ, ಸಿಗರೇಟು ಅಥವಾ ಮದ್ಯ ಸೇವಿಸುತ್ತೀರಾ?",
+      section: "ವೈಯಕ್ತಿಕ ಇತಿಹಾಸ",
+      fieldLabel: "ವೈಯಕ್ತಿಕ ಇತಿಹಾಸ",
+      options: {
+        tobacco: { label: "ಜಗಿಯುವ ತಂಬಾಕು" },
+        smoke: { label: "ಬೀಡಿ ಅಥವಾ ಸಿಗರೇಟು" },
+        alcohol: { label: "ಮದ್ಯ" },
+        none: { label: "ಏನೂ ಇಲ್ಲ" },
+      },
+    },
+    ros: {
+      prompt: "ಕಳೆದ ಒಂದು ತಿಂಗಳಲ್ಲಿ ಇವುಗಳಲ್ಲಿ ಏನಾದರೂ ಗಮನಿಸಿದ್ದೀರಾ?",
+      section: "ದೇಹ ಪರಿಶೀಲನೆ",
+      fieldLabel: "ದೇಹ ಪರಿಶೀಲನೆ",
+      options: {
+        weight: { label: "ತೂಕ ಇಳಿಕೆ" },
+        appetite: { label: "ಹಸಿವು ಕಡಿಮೆ" },
+        urine: { label: "ಪದೇಪದೇ ಮೂತ್ರ" },
+        sleep: { label: "ಸರಿಯಾಗಿ ನಿದ್ರೆ ಬಾರದಿರುವುದು" },
+        swelling: { label: "ಕಾಲುಗಳಲ್ಲಿ ಊತ" },
+        none: { label: "ಹೀಗೇನೂ ಇಲ್ಲ" },
+      },
+    },
+    prior_investigations: {
+      prompt: "ಇತ್ತೀಚೆಗೆ ರಕ್ತ ಪರೀಕ್ಷೆ ಅಥವಾ ಸ್ಕ್ಯಾನ್ ಮಾಡಿಸಿದ್ದೀರಾ?",
+      section: "ಹಿಂದಿನ ಪರೀಕ್ಷೆಗಳು",
+      fieldLabel: "ಹಿಂದಿನ ಪರೀಕ್ಷೆಗಳು",
+      options: {
+        blood: { label: "ಹೌದು, ರಕ್ತ ಪರೀಕ್ಷೆ" },
+        scan: { label: "ಹೌದು, ಎಕ್ಸ್-ರೇ ಅಥವಾ ಸ್ಕ್ಯಾನ್" },
+        no: { label: "ಪರೀಕ್ಷೆ ಮಾಡಿಸಿಲ್ಲ" },
       },
     },
     prakriti: {
@@ -1174,6 +1648,85 @@ const copy: Partial<Record<LanguageCode, Record<string, QuestionCopy>>> = {
         none: { label: "આમાંથી કંઈ નહીં" },
       },
     },
+    past_history: {
+      prompt: "શું ડૉક્ટરે તમને કહ્યું છે કે તમને આમાંથી કોઈ બીમારી છે?",
+      section: "અગાઉની બીમારી",
+      fieldLabel: "અગાઉની સારવાર અને ઓપરેશનનો ઇતિહાસ",
+      options: {
+        dm: { label: "સુગર (ડાયાબિટીસ)" },
+        htn: { label: "બીપી" },
+        asthma: { label: "અસ્થમા" },
+        tb: { label: "અગાઉ ક્યારેક ટીબી" },
+        surgery: { label: "અગાઉ કોઈ ઓપરેશન" },
+        none: { label: "આમાંથી કંઈ નહીં" },
+      },
+    },
+    drug_history: {
+      prompt: "શું તમે રોજ કોઈ દવા લો છો?",
+      section: "દવા અને એલર્જી",
+      fieldLabel: "દવાનો ઇતિહાસ",
+      options: {
+        yes_regular: { label: "હા, રોજ" },
+        sometimes: { label: "ફક્ત ક્યારેક" },
+        no: { label: "કોઈ દવા નહીં" },
+      },
+    },
+    allergy: {
+      prompt: "શું કોઈ દવાથી ક્યારેય ફોલ્લી, સોજો કે શ્વાસ ચડ્યો છે?",
+      section: "દવા અને એલર્જી",
+      fieldLabel: "એલર્જીનો ઇતિહાસ",
+      options: {
+        penicillin: { label: "હા, દુખાવા કે તાવની દવાથી" },
+        other: { label: "હા, પણ નામ ખબર નથી" },
+        no: { label: "ના, ક્યારેય નહીં" },
+      },
+    },
+    family_history: {
+      prompt: "તમારા કુટુંબમાં શું કોઈને આ બીમારીઓ છે?",
+      section: "કૌટુંબિક ઇતિહાસ",
+      fieldLabel: "કૌટુંબિક ઇતિહાસ",
+      options: {
+        dm: { label: "સુગર" },
+        htn: { label: "બીપી" },
+        heart: { label: "હૃદયની તકલીફ" },
+        cancer: { label: "કેન્સર" },
+        none: { label: "કોઈને નહીં" },
+      },
+    },
+    personal_history: {
+      prompt: "શું તમે તમાકુ, બીડી, સિગારેટ કે દારૂ લો છો?",
+      section: "વ્યક્તિગત ઇતિહાસ",
+      fieldLabel: "વ્યક્તિગત ઇતિહાસ",
+      options: {
+        tobacco: { label: "ચાવવાની તમાકુ" },
+        smoke: { label: "બીડી કે સિગારેટ" },
+        alcohol: { label: "દારૂ" },
+        none: { label: "કંઈ નહીં" },
+      },
+    },
+    ros: {
+      prompt: "છેલ્લા એક મહિનામાં શું આમાંથી કંઈ જોયું છે?",
+      section: "શરીરની તપાસ",
+      fieldLabel: "શરીરની તપાસ",
+      options: {
+        weight: { label: "વજન ઘટવું" },
+        appetite: { label: "ભૂખ ઓછી લાગવી" },
+        urine: { label: "વારંવાર પેશાબ" },
+        sleep: { label: "ઊંઘ બરાબર ન આવવી" },
+        swelling: { label: "પગમાં સોજો" },
+        none: { label: "આવું કંઈ નહીં" },
+      },
+    },
+    prior_investigations: {
+      prompt: "શું હાલમાં તમારું લોહી પરીક્ષણ કે સ્કેન થયું છે?",
+      section: "અગાઉની તપાસ",
+      fieldLabel: "અગાઉની તપાસ",
+      options: {
+        blood: { label: "હા, લોહી પરીક્ષણ" },
+        scan: { label: "હા, એક્સ-રે કે સ્કેન" },
+        no: { label: "કોઈ તપાસ થઈ નથી" },
+      },
+    },
     prakriti: {
       prompt: "બાળપણથી તમારું શરીર મોટે ભાગે કેવું રહ્યું છે?",
       section: "પ્રકૃતિ",
@@ -1302,7 +1855,15 @@ const copy: Partial<Record<LanguageCode, Record<string, QuestionCopy>>> = {
 
 export function localizeQuestion(question: Question, language: LanguageCode): Question {
   const localized = copy[language]?.[question.id];
-  if (!localized) return question;
+  if (!localized) {
+    // Dev-only signal: the selected language is NEVER reset — the English
+    // source is shown as a controlled fallback and the gap is logged with
+    // the question key + language so it can be translated properly.
+    if (language !== "en" && !import.meta.env?.PROD) {
+      console.warn("[MISSING TRANSLATION]", language, question.id);
+    }
+    return question;
+  }
   return {
     ...question,
     prompt: localized.prompt ?? question.prompt,
