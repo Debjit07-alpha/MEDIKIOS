@@ -12,7 +12,6 @@ import {
 import { KioskShell, PageHeading } from "@/components/kiosk/KioskShell";
 import { useKiosk, useLanguage } from "@/lib/kiosk-hooks";
 import { api } from "@/lib/api";
-import { isLanguageCode } from "@/lib/kiosk-data";
 import type { Patient } from "@/lib/kiosk-store";
 
 export const Route = createFileRoute("/identity/login")({
@@ -22,7 +21,7 @@ export const Route = createFileRoute("/identity/login")({
 function PatientLoginPage() {
   const navigate = useNavigate();
   const { t } = useLanguage();
-  const { setPatient, setLanguage } = useKiosk();
+  const { setPatient } = useKiosk();
 
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
@@ -64,9 +63,11 @@ function PatientLoginPage() {
       };
 
       setPatient(patientRecord);
-      if (p.preferredLanguage && isLanguageCode(p.preferredLanguage)) {
-        setLanguage(p.preferredLanguage);
-      }
+      // The kiosk language selected on the Language page is the single
+      // source of truth for the whole visit. It must survive sign-in, so
+      // the patient's stored preferredLanguage is deliberately NOT applied
+      // here — deriving the session language from the patient profile is
+      // what reset every non-English selection back to English.
       setSignedIn(patientRecord);
       setStatus("welcomed");
     } catch {
